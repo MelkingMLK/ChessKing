@@ -13,8 +13,11 @@ namespace ChessStrategyApp.ViewModels;
 
 public partial class GameViewModel : ObservableObject
 {
+    public enum GameMode { None, Local, P2P, Solo }
+
     private readonly GameEngineService _engine = new();
     private readonly MatchHistoryService _historyService = new();
+    private readonly SignalRClientService _network = new();
     private readonly Random _random = new();
 
     private ChessSquare? _selectedSquare;
@@ -26,6 +29,83 @@ public partial class GameViewModel : ObservableObject
 
     public ObservableCollection<ChessSquare> Squares { get; } = new();
 
+    // --- STATO DELLA MODALITÀ E NAVIGAZIONE ---
+    private GameMode _currentGameMode = GameMode.None;
+    public GameMode CurrentGameMode
+    {
+        get => _currentGameMode;
+        set
+        {
+            if (SetProperty(ref _currentGameMode, value))
+            {
+                OnPropertyChanged(nameof(IsModeSelectionVisible));
+                OnPropertyChanged(nameof(IsBoardViewVisible));
+            }
+        }
+    }
+
+    public bool IsModeSelectionVisible => CurrentGameMode == GameMode.None;
+    public bool IsBoardViewVisible => CurrentGameMode == GameMode.Local || CurrentGameMode == GameMode.Solo || (CurrentGameMode == GameMode.P2P && IsP2PGameActive);
+
+    // --- STATI ONLINE ROOMS (SIGNALR) ---
+    private bool _isP2PConfigVisible = false;
+    public bool IsP2PConfigVisible
+    {
+        get => _isP2PConfigVisible;
+        set => SetProperty(ref _isP2PConfigVisible, value);
+    }
+
+    private bool _isP2PGameActive = false;
+    public bool IsP2PGameActive
+    {
+        get => _isP2PGameActive;
+        set
+        {
+            if (SetProperty(ref _isP2PGameActive, value))
+            {
+                OnPropertyChanged(nameof(IsBoardViewVisible));
+            }
+        }
+    }
+
+    private string _nickname = "Player_" + Random.Shared.Next(100, 999);
+    public string Nickname
+    {
+        get => _nickname;
+        set => SetProperty(ref _nickname, value);
+    }
+
+private string _serverUrl = "http://localhost:5050/chesshub";
+    public string ServerUrl
+    {
+        get => _serverUrl;
+        set => SetProperty(ref _serverUrl, value);
+    }
+
+    private string _roomCode = "STANZA1";
+    public string RoomCode
+    {
+        get => _roomCode;
+        set => SetProperty(ref _roomCode, value);
+    }
+
+    private string _networkStatus = "Inserisci server, codice stanza e seleziona Crea o Entra.";
+    public string NetworkStatus
+    {
+        get => _networkStatus;
+        set => SetProperty(ref _networkStatus, value);
+    }
+
+    private bool _isConnecting = false;
+    public bool IsConnecting
+    {
+        get => _isConnecting;
+        set => SetProperty(ref _isConnecting, value);
+    }
+
+    private Player _localAssignedPlayer = Player.White;
+
+    // --- TIMER E MESSAGGISTICA ---
     [ObservableProperty]
     private string _whiteTimerText = "15:00";
 
@@ -33,9 +113,9 @@ public partial class GameViewModel : ObservableObject
     private string _blackTimerText = "15:00";
 
     [ObservableProperty]
-    private string _statusMessage = "Inserite i nomi dei giocatori per sorteggiare i colori.";
+    private string _statusMessage = "Seleziona la modalità per iniziare.";
 
-    // GIOCATORE ATTIVO IN EVIDENZA
+    // --- GIOCATORE ATTIVO ---
     [ObservableProperty]
     private string _activePlayerName = "In attesa";
 
@@ -45,7 +125,7 @@ public partial class GameViewModel : ObservableObject
     [ObservableProperty]
     private bool _isWhiteActive = true;
 
-    // PEZZI CATTURATI E DIFFERENZIALE PUNTEGGIO
+    // --- MATERIALE CATTURATO E DELTA PUNTEGGIO ---
     [ObservableProperty]
     private string _whiteCapturedGlyphs = string.Empty;
 
@@ -58,13 +138,12 @@ public partial class GameViewModel : ObservableObject
     [ObservableProperty]
     private string _blackScoreDelta = string.Empty;
 
-    // MODALE PROMOZIONE PEDONE
+    // --- MODALI ---
     [ObservableProperty]
     private bool _isPromotionModalActive = false;
 
-    // SETUP NICKNAME E MODALE SORTEGGIO
     [ObservableProperty]
-    private bool _isSetupModalActive = true;
+    private bool _isSetupModalActive = false;
 
     [ObservableProperty]
     private string _player1Name = "Giocatore 1";
@@ -84,7 +163,6 @@ public partial class GameViewModel : ObservableObject
     [ObservableProperty]
     private bool _canStartMatch = false;
 
-    // POPUP DI VITTORIA
     [ObservableProperty]
     private bool _isVictoryModalActive = false;
 
@@ -97,12 +175,10 @@ public partial class GameViewModel : ObservableObject
     [ObservableProperty]
     private string _victoryDeltaScore = string.Empty;
 
-    public event Action? RequestNavigateToMenu;
-
     public GameViewModel()
     {
         _engine.OnTimeTick += () => Dispatcher.UIThread.Post(UpdateTimerDisplay);
-        
+
         _engine.OnTimeOut += (player) => Dispatcher.UIThread.Post(async () =>
         {
             if (_matchSaved) return;
@@ -112,6 +188,83 @@ public partial class GameViewModel : ObservableObject
         });
 
         _engine.OnMoveExecuted += () => Dispatcher.UIThread.Post(RefreshBoardFromEngine);
+
+        // Cablaggio eventi SignalR
+        _network.OnConnected += () => Dispatcher.UIThread.Post(() =>
+        {
+            NetworkStatus = "Connesso al server...";
+        });
+
+        _network.OnRoomCreated += (code) => Dispatcher.UIThread.Post(() =>
+        {
+            IsConnecting = false;
+            NetworkStatus = $"Stanza [{code}] creata! In attesa che l'avversario entri (colori casuali 50/50)...";
+        });
+
+        _network.OnJoinFailed += (err) => Dispatcher.UIThread.Post(() =>
+        {
+            IsConnecting = false;
+            NetworkStatus = $"Errore di accesso: {err}";
+        });
+
+        _network.OnGameStarted += (assignedColor, opponentName) => Dispatcher.UIThread.Post(() =>
+        {
+            IsConnecting = false;
+            bool amIWhite = assignedColor.Equals("White", StringComparison.OrdinalIgnoreCase);
+            _localAssignedPlayer = amIWhite ? Player.White : Player.Black;
+
+            if (amIWhite)
+            {
+                WhitePlayerName = string.IsNullOrWhiteSpace(Nickname) ? "Tu" : Nickname.Trim();
+                BlackPlayerName = opponentName;
+                NetworkStatus = $"Sorteggio: Sei il BIANCO! Avversario: {opponentName}";
+            }
+            else
+            {
+                WhitePlayerName = opponentName;
+                BlackPlayerName = string.IsNullOrWhiteSpace(Nickname) ? "Tu" : Nickname.Trim();
+                NetworkStatus = $"Sorteggio: Sei il NERO! Avversario: {opponentName}";
+            }
+
+            IsP2PConfigVisible = false;
+            IsP2PGameActive = true;
+            NotifyViewStates();
+
+            _matchStartTime = DateTime.Now;
+            _moves.Clear();
+            _matchSaved = false;
+            _engine.ResetGame();
+            RefreshBoardFromEngine();
+        });
+
+        _network.OnMoveReceived += (movePayload) => Dispatcher.UIThread.Post(() =>
+        {
+            var parts = movePayload.Split('=');
+            var coords = parts[0].Split('-');
+
+            if (coords.Length == 2)
+            {
+                char promo = parts.Length > 1 && parts[1].Length > 0 ? parts[1][0] : ' ';
+                bool success = promo != ' ' ? _engine.TryMove(coords[0], coords[1], promo) : _engine.TryMove(coords[0], coords[1]);
+                if (success)
+                {
+                    _moves.Add(movePayload);
+                    RefreshBoardFromEngine();
+                }
+            }
+        });
+
+        _network.OnOpponentLeft += () => Dispatcher.UIThread.Post(() =>
+        {
+            StatusMessage = "L'avversario ha abbandonato la partita.";
+            NetworkStatus = "Stanza chiusa: l'avversario si è disconnesso.";
+        });
+
+        _network.OnConnectionFailed += (err) => Dispatcher.UIThread.Post(() =>
+        {
+            NetworkStatus = $"Errore di connessione: {err}";
+            IsConnecting = false;
+        });
 
         InitializeEmptyBoard();
         RefreshBoardFromEngine();
@@ -163,7 +316,6 @@ public partial class GameViewModel : ObservableObject
         UpdateTimerDisplay();
         ClearHighlights();
 
-        // Ricalcolo pezzi catturati e bilancio materiale
         var (whiteCaps, blackCaps, advantage) = _engine.GetCapturedPiecesAndScore();
         WhiteCapturedGlyphs = string.Join(" ", whiteCaps);
         BlackCapturedGlyphs = string.Join(" ", blackCaps);
@@ -184,7 +336,6 @@ public partial class GameViewModel : ObservableObject
             BlackScoreDelta = string.Empty;
         }
 
-        // Reset stati animati di controllo Re
         foreach (var sq in Squares)
         {
             sq.IsInCheck = false;
@@ -194,7 +345,7 @@ public partial class GameViewModel : ObservableObject
         CheckKingStatus(Player.White);
         CheckKingStatus(Player.Black);
 
-        if (IsSetupModalActive) return;
+        if (IsModeSelectionVisible || IsSetupModalActive) return;
 
         IsWhiteActive = _engine.Turn == Player.White;
         ActivePlayerName = IsWhiteActive ? WhitePlayerName : BlackPlayerName;
@@ -215,7 +366,7 @@ public partial class GameViewModel : ObservableObject
         }
         else
         {
-            StatusMessage = "Mossa in corso...";
+            StatusMessage = "Partita in corso.";
         }
     }
 
@@ -254,10 +405,97 @@ public partial class GameViewModel : ObservableObject
         }
     }
 
+    // --- SELEZIONE MODALITÀ ---
+    [RelayCommand]
+    private void SelectLocalMode()
+    {
+        CurrentGameMode = GameMode.Local;
+        IsP2PConfigVisible = false;
+        IsP2PGameActive = false;
+        IsSetupModalActive = true;
+    }
+
+    [RelayCommand]
+    private void SelectP2PMode()
+    {
+        CurrentGameMode = GameMode.P2P;
+        IsP2PConfigVisible = true;
+        IsP2PGameActive = false;
+        IsSetupModalActive = false;
+        NetworkStatus = "Inserisci server, codice stanza e seleziona Crea o Entra.";
+    }
+
+    [RelayCommand]
+    private void SelectSoloMode()
+    {
+        CurrentGameMode = GameMode.Solo;
+        IsP2PConfigVisible = false;
+        IsP2PGameActive = false;
+        IsSetupModalActive = false;
+        WhitePlayerName = "Giocatore";
+        BlackPlayerName = "Chess Bot (CPU)";
+        _matchStartTime = DateTime.Now;
+        _moves.Clear();
+        _matchSaved = false;
+        RefreshBoardFromEngine();
+    }
+
+    [RelayCommand]
+    private async Task BackToModeSelection()
+    {
+        await _network.DisconnectAsync();
+        CurrentGameMode = GameMode.None;
+        IsP2PConfigVisible = false;
+        IsP2PGameActive = false;
+        IsVictoryModalActive = false;
+        IsSetupModalActive = false;
+        IsConnecting = false;
+        ResetGame();
+    }
+
+    private void NotifyViewStates()
+    {
+        OnPropertyChanged(nameof(IsModeSelectionVisible));
+        OnPropertyChanged(nameof(IsBoardViewVisible));
+    }
+
+    // --- COMANDI SIGNALR ONLINE ROOMS ---
+    [RelayCommand]
+    private async Task CreateRoom()
+    {
+        if (string.IsNullOrWhiteSpace(RoomCode) || string.IsNullOrWhiteSpace(Nickname))
+        {
+            NetworkStatus = "Inserisci un nickname e un codice stanza.";
+            return;
+        }
+
+        IsConnecting = true;
+        NetworkStatus = $"Creazione stanza [{RoomCode.Trim().ToUpperInvariant()}] in corso...";
+        await _network.CreateRoomAsync(ServerUrl.Trim(), RoomCode.Trim().ToUpperInvariant(), Nickname.Trim());
+    }
+
+    [RelayCommand]
+    private async Task JoinRoom()
+    {
+        if (string.IsNullOrWhiteSpace(RoomCode) || string.IsNullOrWhiteSpace(Nickname))
+        {
+            NetworkStatus = "Inserisci un nickname e un codice stanza.";
+            return;
+        }
+
+        IsConnecting = true;
+        NetworkStatus = $"Accesso alla stanza [{RoomCode.Trim().ToUpperInvariant()}] in corso...";
+        await _network.JoinRoomAsync(ServerUrl.Trim(), RoomCode.Trim().ToUpperInvariant(), Nickname.Trim());
+    }
+
+    // --- GESTIONE MOSSE ---
     [RelayCommand]
     private void SquareClicked(ChessSquare square)
     {
-        if (IsSetupModalActive || _engine.IsGameOver || IsPromotionModalActive || IsVictoryModalActive) return;
+        if (IsModeSelectionVisible || IsSetupModalActive || _engine.IsGameOver || IsPromotionModalActive || IsVictoryModalActive) return;
+
+        // Blocco turni in modalità Online se non è il proprio colore
+        if (CurrentGameMode == GameMode.P2P && _engine.Turn != _localAssignedPlayer) return;
 
         if (_selectedSquare == null)
         {
@@ -307,7 +545,17 @@ public partial class GameViewModel : ObservableObject
             bool success = _engine.TryMove(from, to);
             if (success)
             {
-                _moves.Add($"{from}-{to}");
+                string moveRecord = $"{from}-{to}";
+                _moves.Add(moveRecord);
+
+                if (CurrentGameMode == GameMode.P2P)
+                {
+                    _ = _network.SendMoveAsync(RoomCode.Trim().ToUpperInvariant(), moveRecord);
+                }
+                else if (CurrentGameMode == GameMode.Solo && !_engine.IsGameOver)
+                {
+                    TriggerCpuReply();
+                }
             }
 
             _selectedSquare = null;
@@ -341,7 +589,13 @@ public partial class GameViewModel : ObservableObject
         bool success = _engine.TryMove(_pendingFromSquare, toSquare, promo);
         if (success)
         {
-            _moves.Add($"{_pendingFromSquare}-{toSquare}={promo}");
+            string moveRecord = $"{_pendingFromSquare}-{toSquare}={promo}";
+            _moves.Add(moveRecord);
+
+            if (CurrentGameMode == GameMode.P2P)
+            {
+                _ = _network.SendMoveAsync(RoomCode.Trim().ToUpperInvariant(), moveRecord);
+            }
 
             if (toSquare.Length == 2)
             {
@@ -353,11 +607,51 @@ public partial class GameViewModel : ObservableObject
                     Squares[idx].IsPromoted = true;
                 }
             }
+
+            if (CurrentGameMode == GameMode.Solo && !_engine.IsGameOver)
+            {
+                TriggerCpuReply();
+            }
         }
 
         IsPromotionModalActive = false;
         _pendingFromSquare = string.Empty;
         _pendingToSquare = string.Empty;
+    }
+
+    private void TriggerCpuReply()
+    {
+        Task.Delay(400).ContinueWith(_ =>
+        {
+            Dispatcher.UIThread.Post(() =>
+            {
+                if (_engine.Turn == Player.Black && !_engine.IsGameOver)
+                {
+                    for (int f = 0; f < 8; f++)
+                    {
+                        for (int r = 1; r <= 8; r++)
+                        {
+                            var p = _engine.GetPieceAt(f, r);
+                            if (p != null && p.Owner == Player.Black)
+                            {
+                                string from = $"{(char)('a' + f)}{r}";
+                                var targets = _engine.GetLegalDestinations(from);
+                                if (targets.Count > 0)
+                                {
+                                    string to = $"{(char)('a' + (int)targets[0].File)}{targets[0].Rank}";
+                                    if (_engine.TryMove(from, to))
+                                    {
+                                        _moves.Add($"{from}-{to}");
+                                        RefreshBoardFromEngine();
+                                        return;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        });
     }
 
     private string GetCoord(ChessSquare sq)
@@ -367,6 +661,7 @@ public partial class GameViewModel : ObservableObject
         return $"{file}{rank}";
     }
 
+    // --- SETUP LOCALE ---
     [RelayCommand]
     private void DrawColors()
     {
@@ -383,7 +678,6 @@ public partial class GameViewModel : ObservableObject
         }
 
         bool p1IsWhite = _random.Next(2) == 0;
-
         WhitePlayerName = p1IsWhite ? Player1Name.Trim() : Player2Name.Trim();
         BlackPlayerName = p1IsWhite ? Player2Name.Trim() : Player1Name.Trim();
 
@@ -410,17 +704,9 @@ public partial class GameViewModel : ObservableObject
         _matchSaved = false;
         CanStartMatch = false;
         DrawResultText = string.Empty;
-        IsSetupModalActive = true;
         IsVictoryModalActive = false;
         ActivePlayerName = "In attesa";
         RefreshBoardFromEngine();
-    }
-
-    [RelayCommand]
-    private void ReturnToMenuAfterVictory()
-    {
-        ResetGame();
-        RequestNavigateToMenu?.Invoke();
     }
 
     private async Task SaveCurrentMatchAsync(string winner, string reason)

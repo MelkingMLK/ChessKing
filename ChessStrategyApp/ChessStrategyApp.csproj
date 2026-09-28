@@ -17,5 +17,6 @@
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
     <!-- Libreria Scacchi Ufficiale -->
     <PackageReference Include="ChessDotNet" Version="0.10.0" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.12" />
   </ItemGroup>
 </Project>

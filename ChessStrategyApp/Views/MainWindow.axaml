@@ -10,7 +10,7 @@
         Width="1280" Height="840">
 
     <Window.Styles>
-        <!-- 1. ANIMAZIONE SCACCO: TREMOLIO ORIZZONTALE SUL RE -->
+        <!-- ANIMAZIONE SCACCO: TREMOLIO -->
         <Style Selector="TextBlock.InCheck">
             <Style.Animations>
                 <Animation Duration="0:0:0.35" IterationCount="Infinite">
@@ -36,7 +36,7 @@
             </Style.Animations>
         </Style>
 
-        <!-- 2. ANIMAZIONE SCACCO MATTO: IL RE CADE A 90 GRADI -->
+        <!-- ANIMAZIONE SCACCO MATTO: CADUTA RE -->
         <Style Selector="TextBlock.Checkmated">
             <Setter Property="RenderTransformOrigin" Value="80%,90%"/>
             <Style.Animations>
@@ -58,7 +58,7 @@
             </Style.Animations>
         </Style>
 
-        <!-- 3. ANIMAZIONE PROMOZIONE: POP-IN CON RIMBALZO -->
+        <!-- ANIMAZIONE PROMOZIONE: POP-IN -->
         <Style Selector="TextBlock.Promoted">
             <Setter Property="RenderTransformOrigin" Value="50%,50%"/>
             <Style.Animations>
@@ -116,198 +116,265 @@
             </Grid>
         </Border>
 
-        <!-- CONTENUTO PRINCIPALE -->
+        <!-- CONTENUTO PRINCIPALE (COLONNA 1) -->
         <Grid Grid.Column="1">
             
             <!-- 1. VISTA PLAY -->
             <Grid IsVisible="{Binding IsPlayViewVisible}" Margin="25">
-                <Grid ColumnDefinitions="*, 340">
-                    
-                    <!-- SCACCHIERA -->
-                    <Viewbox Grid.Column="0" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <Border BorderBrush="#684756" BorderThickness="4" CornerRadius="2">
-                            <ItemsControl ItemsSource="{Binding GameBoard.Squares}">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <UniformGrid Rows="8" Columns="8"/>
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
+                
+                <!-- HUB SCELTA MODALITÀ -->
+                <Grid IsVisible="{Binding GameBoard.IsModeSelectionVisible}">
+                    <Border Background="#3D314A" CornerRadius="8" Padding="35" BorderBrush="#684756" BorderThickness="2" MaxWidth="920" MaxHeight="580" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <Grid RowDefinitions="Auto, Auto, *">
+                            <TextBlock Grid.Row="0" Text="SELEZIONA MODALITÀ DI GIOCO" FontSize="26" FontWeight="Black" Foreground="#AB8476" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                            <TextBlock Grid.Row="1" Text="Scegli la tipologia di scontro o allenamento per questa sessione" FontSize="14" Foreground="#AAAABB" HorizontalAlignment="Center" Margin="0,0,0,30"/>
+
+                            <Grid Grid.Row="2" ColumnDefinitions="*, 20, *, 20, *">
                                 
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="models:ChessSquare">
-                                        <Button Command="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).GameBoard.SquareClickedCommand}"
-                                                CommandParameter="{Binding}"
-                                                Padding="0" Margin="0" BorderThickness="0" CornerRadius="0">
-                                            <Panel Width="65" Height="65">
-                                                <!-- Base scacchiera classica -->
-                                                <Rectangle Fill="{Binding BackgroundBrush}"/>
-
-                                                <!-- Highlight casella selezionata -->
-                                                <Rectangle Fill="#684756" Opacity="0.5" IsVisible="{Binding IsSelected}"/>
-
-                                                <!-- Alone per casella sotto scacco e scacco matto -->
-                                                <Rectangle Fill="#FF3333" Opacity="0.45" IsVisible="{Binding IsInCheck}"/>
-                                                <Rectangle Fill="#880000" Opacity="0.7" IsVisible="{Binding IsCheckmated}"/>
-
-                                                <!-- Pezzo scacchistico con classi di animazione e trasformazioni native -->
-                                                <TextBlock Text="{Binding PieceGlyph}" 
-                                                           HorizontalAlignment="Center" 
-                                                           VerticalAlignment="Center" 
-                                                           FontSize="38" 
-                                                           Foreground="{Binding PieceForeground}"
-                                                           Classes.InCheck="{Binding IsInCheck}"
-                                                           Classes.Checkmated="{Binding IsCheckmated}"
-                                                           Classes.Promoted="{Binding IsPromoted}">
-                                                    <TextBlock.RenderTransform>
-                                                        <TransformGroup>
-                                                            <TranslateTransform/>
-                                                            <RotateTransform/>
-                                                            <ScaleTransform/>
-                                                        </TransformGroup>
-                                                    </TextBlock.RenderTransform>
-                                                </TextBlock>
-
-                                                <!-- Pallino traiettoria valida -->
-                                                <Ellipse Width="18" Height="18" 
-                                                         Fill="#AB8476" 
-                                                         Opacity="0.65" 
-                                                         HorizontalAlignment="Center" 
-                                                         VerticalAlignment="Center"
-                                                         IsVisible="{Binding IsTargetMove}"
-                                                         IsHitTestVisible="False"/>
-                                            </Panel>
-                                        </Button>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </Border>
-                    </Viewbox>
-
-                    <!-- PANNELLO LATERALE PLAY -->
-                    <Border Grid.Column="1" Background="#3D314A" CornerRadius="6" BorderBrush="#684756" BorderThickness="1" Margin="20,0,0,0" Padding="18">
-                        <Grid RowDefinitions="Auto, Auto, *, Auto">
-                            <TextBlock Grid.Row="0" Text="PARTITA IN CORSO" FontSize="14" FontWeight="Black" Foreground="#AB8476" Margin="0,0,0,6"/>
-                            <Separator Grid.Row="1" Background="#684756" Margin="0,0,0,12"/>
-                            
-                            <StackPanel Grid.Row="2" Spacing="14">
-                                <!-- Nickname in evidenza del turno corrente -->
-                                <Border Background="#1A1423" CornerRadius="6" Padding="14" BorderBrush="#684756" BorderThickness="1.5">
-                                    <StackPanel Spacing="4" HorizontalAlignment="Center">
-                                        <TextBlock Text="TURNO ATTUALE" FontSize="11" FontWeight="Bold" Foreground="#AB8476" HorizontalAlignment="Center"/>
-                                        <TextBlock Text="{Binding GameBoard.ActivePlayerName}" 
-                                                   FontSize="24" FontWeight="Black" 
-                                                   Foreground="White" 
-                                                   TextAlignment="Center" 
-                                                   TextWrapping="Wrap"/>
-                                        <TextBlock Text="{Binding GameBoard.ActivePlayerColorTag}" 
-                                                   FontSize="13" FontWeight="SemiBold" 
-                                                   Foreground="#AB8476" 
-                                                   HorizontalAlignment="Center"/>
-                                    </StackPanel>
+                                <!-- CARD LOCALE -->
+                                <Border Grid.Column="0" Background="#1A1423" CornerRadius="6" BorderBrush="#684756" BorderThickness="1" Padding="20">
+                                    <Grid RowDefinitions="Auto, *, Auto">
+                                        <TextBlock Grid.Row="0" Text="👥 LOCALE" FontSize="20" FontWeight="Black" Foreground="White" HorizontalAlignment="Center" Margin="0,10,0,10"/>
+                                        <TextBlock Grid.Row="1" Text="Pass and Play sullo stesso monitor. Sorteggio integrato dei colori, orologi sincronizzati e storico." 
+                                                   Foreground="#AB8476" FontSize="12" TextWrapping="Wrap" TextAlignment="Center" Margin="0,10"/>
+                                        <Button Grid.Row="2" Content="GIOCA IN LOCALE" 
+                                                Command="{Binding GameBoard.SelectLocalModeCommand}"
+                                                Background="#96705B" Foreground="White" FontWeight="Bold"
+                                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="12" CornerRadius="4"/>
+                                    </Grid>
                                 </Border>
 
-                                <!-- Orologi, pezzi catturati e bilancio materiale -->
-                                <Grid ColumnDefinitions="*, 8, *">
-                                    
-                                    <!-- Riquadro Bianco -->
-                                    <Border Grid.Column="0" Background="#1A1423" CornerRadius="4" Padding="10">
-                                        <StackPanel Spacing="6" HorizontalAlignment="Center">
-                                            <TextBlock Text="BIANCO" FontSize="10" FontWeight="Bold" Foreground="#AB8476" HorizontalAlignment="Center"/>
-                                            <TextBlock Text="{Binding GameBoard.WhitePlayerName}" FontSize="12" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                                            <TextBlock Text="{Binding GameBoard.WhiteTimerText}" FontSize="18" FontWeight="Heavy" Foreground="White" HorizontalAlignment="Center"/>
-                                            
-                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="4" Margin="0,4,0,0">
-                                                <TextBlock Text="{Binding GameBoard.WhiteCapturedGlyphs}" FontSize="13" Foreground="#8675A9"/>
-                                                <TextBlock Text="{Binding GameBoard.WhiteScoreDelta}" FontSize="12" FontWeight="Black" Foreground="#4CAF50" VerticalAlignment="Center"/>
-                                            </StackPanel>
-                                        </StackPanel>
-                                    </Border>
+                                <!-- CARD ONLINE ROOMS (SIGNALR) -->
+                                <Border Grid.Column="2" Background="#1A1423" CornerRadius="6" BorderBrush="#684756" BorderThickness="1" Padding="20">
+                                    <Grid RowDefinitions="Auto, *, Auto">
+                                        <TextBlock Grid.Row="0" Text="🌐 ONLINE ROOMS" FontSize="20" FontWeight="Black" Foreground="White" HorizontalAlignment="Center" Margin="0,10,0,10"/>
+                                        <TextBlock Grid.Row="1" Text="Stanze private via WebSockets/HTTPS. Bypass totale di firewall universitari e NAT con sorteggio colori casuale." 
+                                                   Foreground="#AB8476" FontSize="12" TextWrapping="Wrap" TextAlignment="Center" Margin="0,10"/>
+                                        <Button Grid.Row="2" Content="MODALITÀ ONLINE" 
+                                                Command="{Binding GameBoard.SelectP2PModeCommand}"
+                                                Background="#684756" Foreground="White" FontWeight="Bold"
+                                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="12" CornerRadius="4"/>
+                                    </Grid>
+                                </Border>
 
-                                    <!-- Riquadro Nero -->
-                                    <Border Grid.Column="2" Background="#1A1423" CornerRadius="4" Padding="10">
-                                        <StackPanel Spacing="6" HorizontalAlignment="Center">
-                                            <TextBlock Text="NERO" FontSize="10" FontWeight="Bold" Foreground="#AB8476" HorizontalAlignment="Center"/>
-                                            <TextBlock Text="{Binding GameBoard.BlackPlayerName}" FontSize="12" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                                            <TextBlock Text="{Binding GameBoard.BlackTimerText}" FontSize="18" FontWeight="Heavy" Foreground="White" HorizontalAlignment="Center"/>
-                                            
-                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="4" Margin="0,4,0,0">
-                                                <TextBlock Text="{Binding GameBoard.BlackCapturedGlyphs}" FontSize="13" Foreground="#AB8476"/>
-                                                <TextBlock Text="{Binding GameBoard.BlackScoreDelta}" FontSize="12" FontWeight="Black" Foreground="#4CAF50" VerticalAlignment="Center"/>
-                                            </StackPanel>
-                                        </StackPanel>
-                                    </Border>
-                                </Grid>
+                                <!-- CARD SOLO -->
+                                <Border Grid.Column="4" Background="#1A1423" CornerRadius="6" BorderBrush="#684756" BorderThickness="1" Padding="20">
+                                    <Grid RowDefinitions="Auto, *, Auto">
+                                        <TextBlock Grid.Row="0" Text="🤖 SOLO / BOT" FontSize="20" FontWeight="Black" Foreground="White" HorizontalAlignment="Center" Margin="0,10,0,10"/>
+                                        <TextBlock Grid.Row="1" Text="Allenati in solitaria contro l'algoritmo di risposta automatico. Ideale per testare repertori e aperture." 
+                                                   Foreground="#AB8476" FontSize="12" TextWrapping="Wrap" TextAlignment="Center" Margin="0,10"/>
+                                        <Button Grid.Row="2" Content="ALLENAMENTO" 
+                                                Command="{Binding GameBoard.SelectSoloModeCommand}"
+                                                Background="#96705B" Foreground="White" FontWeight="Bold"
+                                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="12" CornerRadius="4"/>
+                                    </Grid>
+                                </Border>
 
-                                <TextBlock Text="{Binding GameBoard.StatusMessage}" Foreground="#AAAABB" FontSize="12" TextAlignment="Center" TextWrapping="Wrap"/>
-                            </StackPanel>
-
-                            <Button Grid.Row="3" Content="Nuova Partita / Reset" 
-                                    Command="{Binding GameBoard.ResetGameCommand}"
-                                    Background="#96705B" Foreground="White" FontWeight="Bold"
-                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="10" CornerRadius="4"/>
+                            </Grid>
                         </Grid>
                     </Border>
                 </Grid>
 
-                <!-- MODALE POPUP DI VITTORIA -->
-                <Border Background="#E0101018" IsVisible="{Binding GameBoard.IsVictoryModalActive}" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
-                    <Border Background="#3D314A" BorderBrush="#684756" BorderThickness="2" CornerRadius="10" Padding="30" Width="440" HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <StackPanel Spacing="16" HorizontalAlignment="Center">
-                            <TextBlock Text="🏆 PARTITA CONCLUSA 🏆" FontSize="14" FontWeight="Bold" Foreground="#AB8476" HorizontalAlignment="Center"/>
-                            <TextBlock Text="{Binding GameBoard.VictoryTitle}" FontSize="24" FontWeight="Black" Foreground="White" TextAlignment="Center" TextWrapping="Wrap"/>
-                            <TextBlock Text="{Binding GameBoard.VictoryMessage}" FontSize="14" Foreground="#FFD500" HorizontalAlignment="Center"/>
-                            
-                            <Border Background="#1A1423" CornerRadius="4" Padding="10" Margin="0,5">
-                                <TextBlock Text="{Binding GameBoard.VictoryDeltaScore}" Foreground="White" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                <!-- PANNELLO DI CONNESSIONE ONLINE ROOMS -->
+                <Grid IsVisible="{Binding GameBoard.IsP2PConfigVisible}">
+                    <Border Background="#3D314A" CornerRadius="8" Padding="30" BorderBrush="#684756" BorderThickness="2" Width="480" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <StackPanel Spacing="14">
+                            <TextBlock Text="CONNESSIONE ONLINE ROOMS" FontSize="18" FontWeight="Black" Foreground="#AB8476" HorizontalAlignment="Center"/>
+                            <TextBlock Text="Crea una stanza o entra con il codice. I colori verranno sorteggiati a caso (50/50)." Foreground="#AAAABB" FontSize="11" TextAlignment="Center" TextWrapping="Wrap"/>
+                            <Separator Background="#684756"/>
+
+                            <TextBlock Text="Tuo Nickname:" Foreground="White" FontSize="11"/>
+                            <TextBox Text="{Binding GameBoard.Nickname}" Background="#1A1423" Foreground="White" BorderBrush="#684756"/>
+
+                            <TextBlock Text="Indirizzo Server Relay:" Foreground="White" FontSize="11"/>
+                            <TextBox Text="{Binding GameBoard.ServerUrl}" Background="#1A1423" Foreground="White" BorderBrush="#684756"/>
+
+                            <TextBlock Text="Codice Stanza:" Foreground="White" FontSize="11"/>
+                            <TextBox Text="{Binding GameBoard.RoomCode}" Watermark="Es: TORNEO1" Background="#1A1423" Foreground="White" BorderBrush="#684756"/>
+
+                            <!-- I DUE PULSANTI DISTINTI -->
+                            <Grid ColumnDefinitions="*, 12, *" Margin="0,8,0,0">
+                                <Button Grid.Column="0" Content="🏠 Crea Stanza" 
+                                        Command="{Binding GameBoard.CreateRoomCommand}" 
+                                        Background="#96705B" Foreground="White" FontWeight="Bold" 
+                                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="12" CornerRadius="4"/>
+
+                                <Button Grid.Column="2" Content="🚪 Entra nella Stanza" 
+                                        Command="{Binding GameBoard.JoinRoomCommand}" 
+                                        Background="#684756" Foreground="White" FontWeight="Bold" 
+                                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="12" CornerRadius="4"/>
+                            </Grid>
+
+                            <Border Background="#1A1423" CornerRadius="4" Padding="10" Margin="0,6,0,0">
+                                <TextBlock Text="{Binding GameBoard.NetworkStatus}" Foreground="#AB8476" FontSize="12" TextAlignment="Center" TextWrapping="Wrap"/>
                             </Border>
 
-                            <Button Content="Torna al Menù" 
-                                    Command="{Binding GameBoard.ReturnToMenuAfterVictoryCommand}"
-                                    Background="#96705B" Foreground="White" FontWeight="Bold"
-                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="12" CornerRadius="4"/>
+                            <Button Content="✕ Annulla" Command="{Binding GameBoard.BackToModeSelectionCommand}" Background="Transparent" Foreground="#AAAABB" HorizontalAlignment="Center"/>
                         </StackPanel>
                     </Border>
-                </Border>
+                </Grid>
 
-                <!-- MODALE PROMOZIONE PEDONE -->
-                <Border Background="#D0101018" IsVisible="{Binding GameBoard.IsPromotionModalActive}" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
-                    <Border Background="#3D314A" BorderBrush="#684756" BorderThickness="2" CornerRadius="8" Padding="20" Width="400" HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <StackPanel Spacing="15" HorizontalAlignment="Center">
-                            <TextBlock Text="PROMOZIONE DEL PEDONE" FontSize="16" FontWeight="Black" Foreground="#AB8476" HorizontalAlignment="Center"/>
-                            <TextBlock Text="Scegli il pezzo in cui trasformare il tuo pedone:" Foreground="White" FontSize="12" TextAlignment="Center"/>
+                <!-- VISTA TAVOLO DI GIOCO -->
+                <Grid IsVisible="{Binding GameBoard.IsBoardViewVisible}">
+                    <Grid ColumnDefinitions="*, 340">
+                        
+                        <!-- SCACCHIERA -->
+                        <Viewbox Grid.Column="0" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <Border BorderBrush="#684756" BorderThickness="4" CornerRadius="2">
+                                <ItemsControl ItemsSource="{Binding GameBoard.Squares}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <UniformGrid Rows="8" Columns="8"/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="models:ChessSquare">
+                                            <Button Command="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).GameBoard.SquareClickedCommand}"
+                                                    CommandParameter="{Binding}"
+                                                    Padding="0" Margin="0" BorderThickness="0" CornerRadius="0">
+                                                <Panel Width="65" Height="65">
+                                                    <Rectangle Fill="{Binding BackgroundBrush}"/>
+                                                    <Rectangle Fill="#684756" Opacity="0.5" IsVisible="{Binding IsSelected}"/>
+                                                    <Rectangle Fill="#FF3333" Opacity="0.45" IsVisible="{Binding IsInCheck}"/>
+                                                    <Rectangle Fill="#880000" Opacity="0.7" IsVisible="{Binding IsCheckmated}"/>
 
-                            <Grid ColumnDefinitions="*, *, *, *" Width="320">
-                                <Button Grid.Column="0" Content="♛" Command="{Binding GameBoard.SelectPromotionCommand}" CommandParameter="Q"
-                                        FontSize="32" Foreground="White" Background="#1A1423" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="10" Margin="4" CornerRadius="4"/>
-                                <Button Grid.Column="1" Content="♜" Command="{Binding GameBoard.SelectPromotionCommand}" CommandParameter="R"
-                                        FontSize="32" Foreground="White" Background="#1A1423" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="10" Margin="4" CornerRadius="4"/>
-                                <Button Grid.Column="2" Content="♝" Command="{Binding GameBoard.SelectPromotionCommand}" CommandParameter="B"
-                                        FontSize="32" Foreground="White" Background="#1A1423" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="10" Margin="4" CornerRadius="4"/>
-                                <Button Grid.Column="3" Content="♞" Command="{Binding GameBoard.SelectPromotionCommand}" CommandParameter="N"
-                                        FontSize="32" Foreground="White" Background="#1A1423" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="10" Margin="4" CornerRadius="4"/>
+                                                    <TextBlock Text="{Binding PieceGlyph}" 
+                                                               HorizontalAlignment="Center" 
+                                                               VerticalAlignment="Center" 
+                                                               FontSize="38" 
+                                                               Foreground="{Binding PieceForeground}"
+                                                               Classes.InCheck="{Binding IsInCheck}"
+                                                               Classes.Checkmated="{Binding IsCheckmated}"
+                                                               Classes.Promoted="{Binding IsPromoted}">
+                                                        <TextBlock.RenderTransform>
+                                                            <TransformGroup>
+                                                                <TranslateTransform/>
+                                                                <RotateTransform/>
+                                                                <ScaleTransform/>
+                                                            </TransformGroup>
+                                                        </TextBlock.RenderTransform>
+                                                    </TextBlock>
+
+                                                    <Ellipse Width="18" Height="18" 
+                                                             Fill="#AB8476" 
+                                                             Opacity="0.65" 
+                                                             HorizontalAlignment="Center" 
+                                                             VerticalAlignment="Center"
+                                                             IsVisible="{Binding IsTargetMove}"
+                                                             IsHitTestVisible="False"/>
+                                                </Panel>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </Border>
+                        </Viewbox>
+
+                        <!-- PANNELLO LATERALE PLAY -->
+                        <Border Grid.Column="1" Background="#3D314A" CornerRadius="6" BorderBrush="#684756" BorderThickness="1" Margin="20,0,0,0" Padding="18">
+                            <Grid RowDefinitions="Auto, Auto, *, Auto">
+                                <Grid Grid.Row="0" ColumnDefinitions="*, Auto" Margin="0,0,0,6">
+                                    <TextBlock Grid.Column="0" Text="PARTITA IN CORSO" FontSize="14" FontWeight="Black" Foreground="#AB8476" VerticalAlignment="Center"/>
+                                    <Button Grid.Column="1" Content="✕ Esci" Command="{Binding GameBoard.BackToModeSelectionCommand}" Background="#684756" Foreground="White" FontSize="11" Padding="8,4" CornerRadius="3"/>
+                                </Grid>
+                                <Separator Grid.Row="1" Background="#684756" Margin="0,0,0,12"/>
+                                
+                                <StackPanel Grid.Row="2" Spacing="14">
+                                    <Border Background="#1A1423" CornerRadius="6" Padding="14" BorderBrush="#684756" BorderThickness="1.5">
+                                        <StackPanel Spacing="4" HorizontalAlignment="Center">
+                                            <TextBlock Text="TURNO ATTUALE" FontSize="11" FontWeight="Bold" Foreground="#AB8476" HorizontalAlignment="Center"/>
+                                            <TextBlock Text="{Binding GameBoard.ActivePlayerName}" FontSize="24" FontWeight="Black" Foreground="White" TextAlignment="Center" TextWrapping="Wrap"/>
+                                            <TextBlock Text="{Binding GameBoard.ActivePlayerColorTag}" FontSize="13" FontWeight="SemiBold" Foreground="#AB8476" HorizontalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Grid ColumnDefinitions="*, 8, *">
+                                        <Border Grid.Column="0" Background="#1A1423" CornerRadius="4" Padding="10">
+                                            <StackPanel Spacing="6" HorizontalAlignment="Center">
+                                                <TextBlock Text="BIANCO" FontSize="10" FontWeight="Bold" Foreground="#AB8476" HorizontalAlignment="Center"/>
+                                                <TextBlock Text="{Binding GameBoard.WhitePlayerName}" FontSize="12" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Text="{Binding GameBoard.WhiteTimerText}" FontSize="18" FontWeight="Heavy" Foreground="White" HorizontalAlignment="Center"/>
+                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="4" Margin="0,4,0,0">
+                                                    <TextBlock Text="{Binding GameBoard.WhiteCapturedGlyphs}" FontSize="13" Foreground="#8675A9"/>
+                                                    <TextBlock Text="{Binding GameBoard.WhiteScoreDelta}" FontSize="12" FontWeight="Black" Foreground="#4CAF50" VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <Border Grid.Column="2" Background="#1A1423" CornerRadius="4" Padding="10">
+                                            <StackPanel Spacing="6" HorizontalAlignment="Center">
+                                                <TextBlock Text="NERO" FontSize="10" FontWeight="Bold" Foreground="#AB8476" HorizontalAlignment="Center"/>
+                                                <TextBlock Text="{Binding GameBoard.BlackPlayerName}" FontSize="12" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Text="{Binding GameBoard.BlackTimerText}" FontSize="18" FontWeight="Heavy" Foreground="White" HorizontalAlignment="Center"/>
+                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="4" Margin="0,4,0,0">
+                                                    <TextBlock Text="{Binding GameBoard.BlackCapturedGlyphs}" FontSize="13" Foreground="#AB8476"/>
+                                                    <TextBlock Text="{Binding GameBoard.BlackScoreDelta}" FontSize="12" FontWeight="Black" Foreground="#4CAF50" VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </Border>
+                                    </Grid>
+
+                                    <TextBlock Text="{Binding GameBoard.StatusMessage}" Foreground="#AAAABB" FontSize="12" TextAlignment="Center" TextWrapping="Wrap"/>
+                                </StackPanel>
+
+                                <Button Grid.Row="3" Content="Nuova Partita / Reset" 
+                                        Command="{Binding GameBoard.ResetGameCommand}" 
+                                        Background="#96705B" Foreground="White" FontWeight="Bold" 
+                                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="10" CornerRadius="4"/>
                             </Grid>
-                        </StackPanel>
+                        </Border>
+                    </Grid>
+
+                    <!-- MODALE VITTORIA -->
+                    <Border Background="#E0101018" IsVisible="{Binding GameBoard.IsVictoryModalActive}" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                        <Border Background="#3D314A" BorderBrush="#684756" BorderThickness="2" CornerRadius="10" Padding="30" Width="440" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <StackPanel Spacing="16" HorizontalAlignment="Center">
+                                <TextBlock Text="🏆 PARTITA CONCLUSA 🏆" FontSize="14" FontWeight="Bold" Foreground="#AB8476" HorizontalAlignment="Center"/>
+                                <TextBlock Text="{Binding GameBoard.VictoryTitle}" FontSize="24" FontWeight="Black" Foreground="White" TextAlignment="Center" TextWrapping="Wrap"/>
+                                <TextBlock Text="{Binding GameBoard.VictoryMessage}" FontSize="14" Foreground="#FFD500" HorizontalAlignment="Center"/>
+                                <Border Background="#1A1423" CornerRadius="4" Padding="10" Margin="0,5">
+                                    <TextBlock Text="{Binding GameBoard.VictoryDeltaScore}" Foreground="White" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                                </Border>
+                                <Button Content="Torna alle Modalità" Command="{Binding GameBoard.BackToModeSelectionCommand}" Background="#96705B" Foreground="White" FontWeight="Bold" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="12" CornerRadius="4"/>
+                            </StackPanel>
+                        </Border>
                     </Border>
-                </Border>
 
-                <!-- MODALE SORTEGGIO / SETUP GIOCATORI -->
-                <Border Background="#D0101018" IsVisible="{Binding GameBoard.IsSetupModalActive}" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
-                    <Border Background="#3D314A" BorderBrush="#684756" BorderThickness="2" CornerRadius="8" Padding="25" Width="460" HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <StackPanel Spacing="12">
-                            <TextBlock Text="SETUP PARTITA &amp; SORTEGGIO" FontSize="18" FontWeight="Black" Foreground="#AB8476" HorizontalAlignment="Center"/>
-                            <TextBlock Text="Giocatore 1:" Foreground="White" FontSize="12"/>
-                            <TextBox Text="{Binding GameBoard.Player1Name}" Background="#1A1423" Foreground="White" BorderBrush="#684756"/>
-                            <TextBlock Text="Giocatore 2:" Foreground="White" FontSize="12"/>
-                            <TextBox Text="{Binding GameBoard.Player2Name}" Background="#1A1423" Foreground="White" BorderBrush="#684756"/>
-
-                            <Button Content="🎲 Sorteggia Colori" Command="{Binding GameBoard.DrawColorsCommand}" Background="#96705B" Foreground="White" FontWeight="Bold" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="10" CornerRadius="4"/>
-
-                            <TextBlock Text="{Binding GameBoard.DrawResultText}" Foreground="#AB8476" FontWeight="SemiBold" TextAlignment="Center" TextWrapping="Wrap"/>
-
-                            <Button Content="Inizia Partita" Command="{Binding GameBoard.StartMatchCommand}" IsVisible="{Binding GameBoard.CanStartMatch}" Background="#4CAF50" Foreground="White" FontWeight="Bold" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="12" CornerRadius="4"/>
-                        </StackPanel>
+                    <!-- MODALE PROMOZIONE -->
+                    <Border Background="#D0101018" IsVisible="{Binding GameBoard.IsPromotionModalActive}" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                        <Border Background="#3D314A" BorderBrush="#684756" BorderThickness="2" CornerRadius="8" Padding="20" Width="400" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <StackPanel Spacing="15" HorizontalAlignment="Center">
+                                <TextBlock Text="PROMOZIONE DEL PEDONE" FontSize="16" FontWeight="Black" Foreground="#AB8476" HorizontalAlignment="Center"/>
+                                <TextBlock Text="Scegli il pezzo in cui trasformare il tuo pedone:" Foreground="White" FontSize="12" TextAlignment="Center"/>
+                                <Grid ColumnDefinitions="*, *, *, *" Width="320">
+                                    <Button Grid.Column="0" Content="♛" Command="{Binding GameBoard.SelectPromotionCommand}" CommandParameter="Q" FontSize="32" Foreground="White" Background="#1A1423" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="10" Margin="4" CornerRadius="4"/>
+                                    <Button Grid.Column="1" Content="♜" Command="{Binding GameBoard.SelectPromotionCommand}" CommandParameter="R" FontSize="32" Foreground="White" Background="#1A1423" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="10" Margin="4" CornerRadius="4"/>
+                                    <Button Grid.Column="2" Content="♝" Command="{Binding GameBoard.SelectPromotionCommand}" CommandParameter="B" FontSize="32" Foreground="White" Background="#1A1423" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="10" Margin="4" CornerRadius="4"/>
+                                    <Button Grid.Column="3" Content="♞" Command="{Binding GameBoard.SelectPromotionCommand}" CommandParameter="N" FontSize="32" Foreground="White" Background="#1A1423" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="10" Margin="4" CornerRadius="4"/>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
                     </Border>
-                </Border>
+
+                    <!-- MODALE SETUP LOCALE -->
+                    <Border Background="#D0101018" IsVisible="{Binding GameBoard.IsSetupModalActive}" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                        <Border Background="#3D314A" BorderBrush="#684756" BorderThickness="2" CornerRadius="8" Padding="25" Width="460" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <StackPanel Spacing="12">
+                                <TextBlock Text="SETUP PARTITA LOCALE" FontSize="18" FontWeight="Black" Foreground="#AB8476" HorizontalAlignment="Center"/>
+                                <TextBlock Text="Giocatore 1:" Foreground="White" FontSize="12"/>
+                                <TextBox Text="{Binding GameBoard.Player1Name}" Background="#1A1423" Foreground="White" BorderBrush="#684756"/>
+                                <TextBlock Text="Giocatore 2:" Foreground="White" FontSize="12"/>
+                                <TextBox Text="{Binding GameBoard.Player2Name}" Background="#1A1423" Foreground="White" BorderBrush="#684756"/>
+                                <Button Content="🎲 Sorteggia Colori" Command="{Binding GameBoard.DrawColorsCommand}" Background="#96705B" Foreground="White" FontWeight="Bold" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="10" CornerRadius="4"/>
+                                <TextBlock Text="{Binding GameBoard.DrawResultText}" Foreground="#AB8476" FontWeight="SemiBold" TextAlignment="Center" TextWrapping="Wrap"/>
+                                <Button Content="Inizia Partita" Command="{Binding GameBoard.StartMatchCommand}" IsVisible="{Binding GameBoard.CanStartMatch}" Background="#4CAF50" Foreground="White" FontWeight="Bold" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="12" CornerRadius="4"/>
+                                <Button Content="✕ Torna al Menù" Command="{Binding GameBoard.BackToModeSelectionCommand}" Background="Transparent" Foreground="#AAAABB" HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+                    </Border>
+
+                </Grid>
             </Grid>
 
             <!-- 2. VISTA STRATEGY -->
@@ -318,7 +385,6 @@
                         <Separator Grid.Row="1" Background="#684756" Margin="0,0,0,15"/>
                         
                         <Grid Grid.Row="2" ColumnDefinitions="1.2*, *">
-                            <!-- LISTA APERTURE -->
                             <Grid Grid.Column="0" RowDefinitions="Auto, Auto, *" Margin="0,0,20,0">
                                 <StackPanel Grid.Row="0" Spacing="6" Margin="0,0,0,10">
                                     <TextBlock Text="FILTRI" FontSize="12" FontWeight="Bold" Foreground="#AB8476"/>
@@ -360,7 +426,6 @@
                                 </ListBox>
                             </Grid>
 
-                            <!-- FORM INSERIMENTO -->
                             <Border Grid.Column="1" Background="#1A1423" CornerRadius="6" Padding="15" BorderBrush="#684756" BorderThickness="1">
                                 <StackPanel Spacing="8">
                                     <TextBlock Text="REGISTRA / MODIFICA APERTURA" FontSize="13" FontWeight="Bold" Foreground="#AB8476"/>
@@ -415,7 +480,7 @@
                     </Grid>
                 </Border>
 
-                <!-- VISTA REPLAY -->
+                <!-- VISTA REPLAY STRATEGIA -->
                 <Border Background="#3D314A" CornerRadius="6" Padding="20" BorderBrush="#684756" BorderThickness="1" IsVisible="{Binding StrategyViewer.IsViewerOpen}">
                     <Grid RowDefinitions="Auto, *, Auto">
                         <Grid Grid.Row="0" ColumnDefinitions="*, Auto" Margin="0,0,0,10">
@@ -537,6 +602,6 @@
                 </Border>
             </Grid>
 
-        </Grid>
-    </Grid>
+        </Grid> <!-- Fine Colonna 1 -->
+    </Grid> <!-- Fine Root Grid -->
 </Window>
