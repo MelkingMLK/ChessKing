@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Threading.Tasks;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -28,6 +29,13 @@ public partial class GameViewModel : ObservableObject
     private bool _matchSaved = false;
 
     public ObservableCollection<ChessSquare> Squares { get; } = new();
+
+    // --- STORICO MOSSE SEPARATO (BIANCO E NERO) ---
+    public ObservableCollection<string> WhiteMovesHistory { get; } = new();
+    public ObservableCollection<string> BlackMovesHistory { get; } = new();
+
+    // --- TRACCIAMENTO ULTIMA MOSSA AVVERSARIO ---
+    private (int FromRow, int FromCol, int ToRow, int ToCol)? _lastOpponentMove;
 
     // --- STATO DELLA MODALITÀ E NAVIGAZIONE ---
     private GameMode _currentGameMode = GameMode.None;
@@ -75,7 +83,7 @@ public partial class GameViewModel : ObservableObject
         set => SetProperty(ref _nickname, value);
     }
 
-private string _serverUrl = "http://localhost:5050/chesshub";
+    private string _serverUrl = "https://dependably-enginous-azzie.ngrok-free.dev/chesshub";
     public string ServerUrl
     {
         get => _serverUrl;
@@ -125,12 +133,21 @@ private string _serverUrl = "http://localhost:5050/chesshub";
     [ObservableProperty]
     private bool _isWhiteActive = true;
 
-    // --- MATERIALE CATTURATO E DELTA PUNTEGGIO ---
-    [ObservableProperty]
-    private string _whiteCapturedGlyphs = string.Empty;
+    // --- MATERIALE CATTURATO (FIFO MAX 4 + BADGE OVERFLOW) ---
+    public ObservableCollection<string> DisplayedWhiteCaptured { get; } = new();
+    public ObservableCollection<string> DisplayedBlackCaptured { get; } = new();
 
     [ObservableProperty]
-    private string _blackCapturedGlyphs = string.Empty;
+    private string _whiteCapturedOverflowBadge = string.Empty;
+
+    [ObservableProperty]
+    private string _blackCapturedOverflowBadge = string.Empty;
+
+    [ObservableProperty]
+    private bool _hasWhiteOverflow = false;
+
+    [ObservableProperty]
+    private bool _hasBlackOverflow = false;
 
     [ObservableProperty]
     private string _whiteScoreDelta = string.Empty;
@@ -232,6 +249,9 @@ private string _serverUrl = "http://localhost:5050/chesshub";
 
             _matchStartTime = DateTime.Now;
             _moves.Clear();
+            WhiteMovesHistory.Clear();
+            BlackMovesHistory.Clear();
+            _lastOpponentMove = null;
             _matchSaved = false;
             _engine.ResetGame();
             RefreshBoardFromEngine();
@@ -249,6 +269,7 @@ private string _serverUrl = "http://localhost:5050/chesshub";
                 if (success)
                 {
                     _moves.Add(movePayload);
+                    RecordMoveInHistory(coords[0], coords[1], isWhiteTurn: _engine.Turn != Player.White, isOpponent: true);
                     RefreshBoardFromEngine();
                 }
             }
@@ -316,9 +337,19 @@ private string _serverUrl = "http://localhost:5050/chesshub";
         UpdateTimerDisplay();
         ClearHighlights();
 
+        // Ripristino evidenziazione ultima mossa (se presente)
+        if (_lastOpponentMove.HasValue)
+        {
+            var m = _lastOpponentMove.Value;
+            var fromSq = Squares.FirstOrDefault(s => s.Row == m.FromRow && s.Column == m.FromCol);
+            var toSq = Squares.FirstOrDefault(s => s.Row == m.ToRow && s.Column == m.ToCol);
+            if (fromSq != null) { fromSq.IsLastMoveHighlight = true; fromSq.TriggerBackgroundUpdate(); }
+            if (toSq != null) { toSq.IsLastMoveHighlight = true; toSq.TriggerBackgroundUpdate(); }
+        }
+
+        // Calcolo e filtraggio catturati con regola Max 4 + Badge
         var (whiteCaps, blackCaps, advantage) = _engine.GetCapturedPiecesAndScore();
-        WhiteCapturedGlyphs = string.Join(" ", whiteCaps);
-        BlackCapturedGlyphs = string.Join(" ", blackCaps);
+        UpdateCapturedLists(whiteCaps, blackCaps);
 
         if (advantage > 0)
         {
@@ -370,6 +401,61 @@ private string _serverUrl = "http://localhost:5050/chesshub";
         }
     }
 
+    private void UpdateCapturedLists(List<string> whiteCaps, List<string> blackCaps)
+    {
+        // Catturati dal Bianco
+        DisplayedWhiteCaptured.Clear();
+        foreach (var p in whiteCaps.TakeLast(4)) DisplayedWhiteCaptured.Add(p);
+        int wOver = whiteCaps.Count - 4;
+        HasWhiteOverflow = wOver > 0;
+        WhiteCapturedOverflowBadge = wOver > 0 ? $"+{wOver}" : string.Empty;
+
+        // Catturati dal Nero
+        DisplayedBlackCaptured.Clear();
+        foreach (var p in blackCaps.TakeLast(4)) DisplayedBlackCaptured.Add(p);
+        int bOver = blackCaps.Count - 4;
+        HasBlackOverflow = bOver > 0;
+        BlackCapturedOverflowBadge = bOver > 0 ? $"+{bOver}" : string.Empty;
+    }
+
+    private void RecordMoveInHistory(string from, string to, bool isWhiteTurn, bool isOpponent)
+    {
+        string record = $"{from} → {to}";
+        if (isWhiteTurn)
+            WhiteMovesHistory.Add(record);
+        else
+            BlackMovesHistory.Add(record);
+
+        int fromCol = from[0] - 'a';
+        int fromRow = 8 - (from[1] - '0');
+        int toCol = to[0] - 'a';
+        int toRow = 8 - (to[1] - '0');
+
+        _lastOpponentMove = (fromRow, fromCol, toRow, toCol);
+    }
+
+    [RelayCommand]
+    private void InspectLastOpponentMove()
+    {
+        if (!_lastOpponentMove.HasValue) return;
+
+        var m = _lastOpponentMove.Value;
+        foreach (var sq in Squares)
+        {
+            if (sq.IsLastMoveHighlight)
+            {
+                sq.IsLastMoveHighlight = false;
+                sq.TriggerBackgroundUpdate();
+            }
+        }
+
+        var origin = Squares.FirstOrDefault(s => s.Row == m.FromRow && s.Column == m.FromCol);
+        var dest = Squares.FirstOrDefault(s => s.Row == m.ToRow && s.Column == m.ToCol);
+
+        if (origin != null) { origin.IsLastMoveHighlight = true; origin.TriggerBackgroundUpdate(); }
+        if (dest != null) { dest.IsLastMoveHighlight = true; dest.TriggerBackgroundUpdate(); }
+    }
+
     private void CheckKingStatus(Player player)
     {
         if (_engine.IsPlayerCheckmated(player))
@@ -402,6 +488,11 @@ private string _serverUrl = "http://localhost:5050/chesshub";
         {
             sq.IsTargetMove = false;
             sq.IsSelected = false;
+            if (sq.IsLastMoveHighlight)
+            {
+                sq.IsLastMoveHighlight = false;
+                sq.TriggerBackgroundUpdate();
+            }
         }
     }
 
@@ -436,6 +527,9 @@ private string _serverUrl = "http://localhost:5050/chesshub";
         BlackPlayerName = "Chess Bot (CPU)";
         _matchStartTime = DateTime.Now;
         _moves.Clear();
+        WhiteMovesHistory.Clear();
+        BlackMovesHistory.Clear();
+        _lastOpponentMove = null;
         _matchSaved = false;
         RefreshBoardFromEngine();
     }
@@ -494,7 +588,6 @@ private string _serverUrl = "http://localhost:5050/chesshub";
     {
         if (IsModeSelectionVisible || IsSetupModalActive || _engine.IsGameOver || IsPromotionModalActive || IsVictoryModalActive) return;
 
-        // Blocco turni in modalità Online se non è il proprio colore
         if (CurrentGameMode == GameMode.P2P && _engine.Turn != _localAssignedPlayer) return;
 
         if (_selectedSquare == null)
@@ -542,11 +635,13 @@ private string _serverUrl = "http://localhost:5050/chesshub";
                 return;
             }
 
+            bool wasWhite = _engine.Turn == Player.White;
             bool success = _engine.TryMove(from, to);
             if (success)
             {
                 string moveRecord = $"{from}-{to}";
                 _moves.Add(moveRecord);
+                RecordMoveInHistory(from, to, isWhiteTurn: wasWhite, isOpponent: false);
 
                 if (CurrentGameMode == GameMode.P2P)
                 {
@@ -586,11 +681,13 @@ private string _serverUrl = "http://localhost:5050/chesshub";
     {
         char promo = pieceCode.ToUpperInvariant()[0];
         string toSquare = _pendingToSquare;
+        bool wasWhite = _engine.Turn == Player.White;
         bool success = _engine.TryMove(_pendingFromSquare, toSquare, promo);
         if (success)
         {
             string moveRecord = $"{_pendingFromSquare}-{toSquare}={promo}";
             _moves.Add(moveRecord);
+            RecordMoveInHistory(_pendingFromSquare, toSquare, isWhiteTurn: wasWhite, isOpponent: false);
 
             if (CurrentGameMode == GameMode.P2P)
             {
@@ -642,6 +739,7 @@ private string _serverUrl = "http://localhost:5050/chesshub";
                                     if (_engine.TryMove(from, to))
                                     {
                                         _moves.Add($"{from}-{to}");
+                                        RecordMoveInHistory(from, to, isWhiteTurn: false, isOpponent: true);
                                         RefreshBoardFromEngine();
                                         return;
                                     }
@@ -691,6 +789,9 @@ private string _serverUrl = "http://localhost:5050/chesshub";
         IsSetupModalActive = false;
         _matchStartTime = DateTime.Now;
         _moves.Clear();
+        WhiteMovesHistory.Clear();
+        BlackMovesHistory.Clear();
+        _lastOpponentMove = null;
         _matchSaved = false;
         RefreshBoardFromEngine();
     }
@@ -701,6 +802,9 @@ private string _serverUrl = "http://localhost:5050/chesshub";
         _engine.ResetGame();
         _selectedSquare = null;
         _moves.Clear();
+        WhiteMovesHistory.Clear();
+        BlackMovesHistory.Clear();
+        _lastOpponentMove = null;
         _matchSaved = false;
         CanStartMatch = false;
         DrawResultText = string.Empty;

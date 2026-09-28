@@ -1,0 +1,107 @@
+# ChessKing 
+
+**ChessKing** è una piattaforma scacchistica desktop multipiattaforma sviluppata in **C# / .NET 8** con interfaccia reattiva in **Avalonia UI** (architettura MVVMTK) e modulo di sincronizzazione online in tempo reale basato su **ASP.NET Core SignalR**.
+
+Il progetto integra un motore di validazione regolamentare, un gestore interattivo di aperture/strategie con serializzazione locale JSON e un'infrastruttura di rete a stanze con matchmaking server-authoritative.
+
+---
+
+## Architettura del Sistema
+
+La soluzione è composta da due progetti distinti:
+
+1. **`ChessStrategyApp` (Client Desktop)**
+   * **GUI Framework**: Avalonia UI 11 (XAML multipiattaforma).
+   * **Pattern**: MVVM via CommunityToolkit.Mvvm.
+   * **Regolamento Scacchi**: ChessDotNet per parsing FEN, notazione SAN e controllo scacchi/scacco matto.
+   * **Networking Client**: `Microsoft.AspNetCore.SignalR.Client` su protocollo WebSocket.
+   * **Persistenza**: Salvataggio asincrono dello storico partite e dell'albero aperture in directory protetta OS-compliant (`Environment.SpecialFolder.ApplicationData`).
+
+2. **`ChessRelayServer` (Server Relay)**
+   * Microservizio ASP.NET Core Kestrel.
+   * Hub SignalR con gestione concorrente delle stanze (`ConcurrentDictionary`).
+   * Sorteggio equo e crittografico del colore assegnato (50/50 White/Black) al completamento della stanza.
+   * Relay trasparente di mosse e comandi di sincronizzazione.
+
+---
+
+## 📋 Requisiti di Sistema
+
+* [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) (o superiore, supportato tramite roll-forward).
+* **OS Supportati**: macOS (Apple Silicon / Intel), Windows 10/11 (x64/ARM64), Linux (glibc).
+
+---
+
+## Installazione e Avvio Rapido
+
+### Clonazione Repository
+```bash
+git clone [https://github.com/tuo-username/ChessKing.git](https://github.com/tuo-username/ChessKing.git)
+cd ChessKing
+```
+
+---
+
+### 🍏 macOS / Linux
+
+#### 1. Avviare il Server Relay (Opzionale se si gioca solo in locale o bot)
+```bash
+cd ChessRelayServer
+dotnet run
+```
+*Il server si metterà in ascolto locale sulla porta predefinita (es. `ngrok` o `http://localhost:5000`).*
+
+#### 2. Avviare il Client Desktop
+In una nuova finestra di terminale:
+```bash
+cd ChessStrategyApp
+dotnet run
+```
+
+---
+
+### 🪟 Windows
+
+1. Esegui lo script di configurazione dipendenze:
+   ```cmd
+   setup_windows.bat
+   ```
+2. Per avviare il client:
+   ```cmd
+   run_client.bat
+   ```
+   *(Oppure manualmente: `cd ChessStrategyApp && dotnet run`)*.
+
+---
+
+## 🌐 Gioco Online (Multiplayer a Distanza)
+
+1. **Avvio dell'Hub Pubblico**:
+   Se i giocatori non si trovano sulla stessa LAN Wi-Fi, esporre il server locale tramite un reverse proxy o tunnel:
+   ```bash
+   ngrok http 5050
+   ```
+2. **Connessione nel Client**:
+   * Aprire `ChessKing` e selezionare **Modalità Online**.
+   * Inserire il proprio **Nickname**.
+   * Impostare l'**Indirizzo Server Relay** (es. `https://xxxx.ngrok-free.app/chesshub` senza porte esplicite).
+   * Inserire un **Codice Stanza** condiviso (es: `STANZA1`).
+   * Giocatore 1 preme **Crea Stanza**; Giocatore 2 preme **Entra nella Stanza**.
+   * Il server abbinerà i giocatori, sorteggerà casualmente i colori e inizializzerà il tabellone.
+
+---
+
+## 🎨 Design System e Palette
+
+L'interfaccia adotta una palette dark a contrasto bilanciato:
+* Sfondo Principale: `#1A1423`
+* Sidebar / Pannelli Secondari: `#3D314A`
+* Bordi e Divisori Strutturali: `#684756`
+* Accenti Primari / CTA: `#96705B`
+* Testi Evidenziati / Titoli: `#AB8476`
+* Scacchiera: Bianco e Nero ad alto contrasto con indicatori di stato (Scacco, Selezione, Mosse Legali).
+
+---
+
+## 📄 Licenza
+Distribuito sotto licenza MIT. Libero per scopi didattici e di sviluppo.
