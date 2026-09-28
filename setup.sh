@@ -80,3 +80,6 @@ echo
 if [[ $REPLY =~ ^[Ss]$ ]] || [[ -z $REPLY ]]; then
     dotnet run --project "$REPO_ROOT/ChessStrategyApp"
 fi
+
+
+chmod +x "$REPO_ROOT/setup.sh"
