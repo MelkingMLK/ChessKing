@@ -34,8 +34,8 @@ public partial class GameViewModel : ObservableObject
     public ObservableCollection<string> WhiteMovesHistory { get; } = new();
     public ObservableCollection<string> BlackMovesHistory { get; } = new();
 
-    // --- TRACCIAMENTO ULTIMA MOSSA AVVERSARIO ---
-    private (int FromRow, int FromCol, int ToRow, int ToCol)? _lastOpponentMove;
+    // --- TRACCIAMENTO ULTIMA MOSSA (COORDINATE LOGICHE PER CORNER MARKERS) ---
+    private (int FromFile, int FromRank, int ToFile, int ToRank)? _lastMoveCoordinates;
 
     // --- STATO DELLA MODALITÀ E NAVIGAZIONE ---
     private GameMode _currentGameMode = GameMode.None;
@@ -112,6 +112,27 @@ public partial class GameViewModel : ObservableObject
     }
 
     private Player _localAssignedPlayer = Player.White;
+
+    // --- LOGICA DI RIBALTAMENTO PROSPETTIVA DELLA SCACCHIERA ---
+    private bool IsBoardFlipped => CurrentGameMode == GameMode.P2P && _localAssignedPlayer == Player.Black;
+
+    private (int file, int rank) DisplayToChessCoords(int displayRow, int displayCol)
+    {
+        if (IsBoardFlipped)
+        {
+            return (7 - displayCol, displayRow + 1);
+        }
+        return (displayCol, 8 - displayRow);
+    }
+
+    private (int displayRow, int displayCol) ChessToDisplayCoords(int file, int rank)
+    {
+        if (IsBoardFlipped)
+        {
+            return (rank - 1, 7 - file);
+        }
+        return (8 - rank, file);
+    }
 
     // --- TIMER E MESSAGGISTICA ---
     [ObservableProperty]
@@ -251,7 +272,7 @@ public partial class GameViewModel : ObservableObject
             _moves.Clear();
             WhiteMovesHistory.Clear();
             BlackMovesHistory.Clear();
-            _lastOpponentMove = null;
+            _lastMoveCoordinates = null;
             _matchSaved = false;
             _engine.ResetGame();
             RefreshBoardFromEngine();
@@ -269,7 +290,7 @@ public partial class GameViewModel : ObservableObject
                 if (success)
                 {
                     _moves.Add(movePayload);
-                    RecordMoveInHistory(coords[0], coords[1], isWhiteTurn: _engine.Turn != Player.White, isOpponent: true);
+                    RecordMoveInHistory(coords[0], coords[1], isWhiteTurn: _engine.Turn != Player.White);
                     RefreshBoardFromEngine();
                 }
             }
@@ -315,8 +336,7 @@ public partial class GameViewModel : ObservableObject
         {
             for (int c = 0; c < 8; c++)
             {
-                int chessRank = 8 - r;
-                int chessFile = c;
+                var (chessFile, chessRank) = DisplayToChessCoords(r, c);
 
                 var piece = _engine.GetPieceAt(chessFile, chessRank);
                 int index = r * 8 + c;
@@ -337,17 +357,29 @@ public partial class GameViewModel : ObservableObject
         UpdateTimerDisplay();
         ClearHighlights();
 
-        // Ripristino evidenziazione ultima mossa (se presente)
-        if (_lastOpponentMove.HasValue)
+        // Evidenziazione Corner Markers proiettata sulla visuale attiva
+        if (_lastMoveCoordinates.HasValue)
         {
-            var m = _lastOpponentMove.Value;
-            var fromSq = Squares.FirstOrDefault(s => s.Row == m.FromRow && s.Column == m.FromCol);
-            var toSq = Squares.FirstOrDefault(s => s.Row == m.ToRow && s.Column == m.ToCol);
-            if (fromSq != null) { fromSq.IsLastMoveHighlight = true; fromSq.TriggerBackgroundUpdate(); }
-            if (toSq != null) { toSq.IsLastMoveHighlight = true; toSq.TriggerBackgroundUpdate(); }
+            var m = _lastMoveCoordinates.Value;
+            var (dispFromR, dispFromC) = ChessToDisplayCoords(m.FromFile, m.FromRank);
+            var (dispToR, dispToC) = ChessToDisplayCoords(m.ToFile, m.ToRank);
+
+            int idxFrom = dispFromR * 8 + dispFromC;
+            int idxTo = dispToR * 8 + dispToC;
+
+            if (idxFrom >= 0 && idxFrom < Squares.Count)
+            {
+                Squares[idxFrom].IsLastMoveHighlight = true;
+                Squares[idxFrom].TriggerBackgroundUpdate();
+            }
+            if (idxTo >= 0 && idxTo < Squares.Count)
+            {
+                Squares[idxTo].IsLastMoveHighlight = true;
+                Squares[idxTo].TriggerBackgroundUpdate();
+            }
         }
 
-        // Calcolo e filtraggio catturati con regola Max 4 + Badge
+        // Calcolo e filtraggio catturati (Max 4 + Badge numerico)
         var (whiteCaps, blackCaps, advantage) = _engine.GetCapturedPiecesAndScore();
         UpdateCapturedLists(whiteCaps, blackCaps);
 
@@ -403,14 +435,12 @@ public partial class GameViewModel : ObservableObject
 
     private void UpdateCapturedLists(List<string> whiteCaps, List<string> blackCaps)
     {
-        // Catturati dal Bianco
         DisplayedWhiteCaptured.Clear();
         foreach (var p in whiteCaps.TakeLast(4)) DisplayedWhiteCaptured.Add(p);
         int wOver = whiteCaps.Count - 4;
         HasWhiteOverflow = wOver > 0;
         WhiteCapturedOverflowBadge = wOver > 0 ? $"+{wOver}" : string.Empty;
 
-        // Catturati dal Nero
         DisplayedBlackCaptured.Clear();
         foreach (var p in blackCaps.TakeLast(4)) DisplayedBlackCaptured.Add(p);
         int bOver = blackCaps.Count - 4;
@@ -418,7 +448,7 @@ public partial class GameViewModel : ObservableObject
         BlackCapturedOverflowBadge = bOver > 0 ? $"+{bOver}" : string.Empty;
     }
 
-    private void RecordMoveInHistory(string from, string to, bool isWhiteTurn, bool isOpponent)
+    private void RecordMoveInHistory(string from, string to, bool isWhiteTurn)
     {
         string record = $"{from} → {to}";
         if (isWhiteTurn)
@@ -426,34 +456,12 @@ public partial class GameViewModel : ObservableObject
         else
             BlackMovesHistory.Add(record);
 
-        int fromCol = from[0] - 'a';
-        int fromRow = 8 - (from[1] - '0');
-        int toCol = to[0] - 'a';
-        int toRow = 8 - (to[1] - '0');
+        int fromFile = from[0] - 'a';
+        int fromRank = from[1] - '0';
+        int toFile = to[0] - 'a';
+        int toRank = to[1] - '0';
 
-        _lastOpponentMove = (fromRow, fromCol, toRow, toCol);
-    }
-
-    [RelayCommand]
-    private void InspectLastOpponentMove()
-    {
-        if (!_lastOpponentMove.HasValue) return;
-
-        var m = _lastOpponentMove.Value;
-        foreach (var sq in Squares)
-        {
-            if (sq.IsLastMoveHighlight)
-            {
-                sq.IsLastMoveHighlight = false;
-                sq.TriggerBackgroundUpdate();
-            }
-        }
-
-        var origin = Squares.FirstOrDefault(s => s.Row == m.FromRow && s.Column == m.FromCol);
-        var dest = Squares.FirstOrDefault(s => s.Row == m.ToRow && s.Column == m.ToCol);
-
-        if (origin != null) { origin.IsLastMoveHighlight = true; origin.TriggerBackgroundUpdate(); }
-        if (dest != null) { dest.IsLastMoveHighlight = true; dest.TriggerBackgroundUpdate(); }
+        _lastMoveCoordinates = (fromFile, fromRank, toFile, toRank);
     }
 
     private void CheckKingStatus(Player player)
@@ -472,9 +480,8 @@ public partial class GameViewModel : ObservableObject
 
     private void SetSquareKingState(Position pos, bool isInCheck = false, bool isCheckmated = false)
     {
-        int col = (int)pos.File;
-        int row = 8 - pos.Rank;
-        int idx = row * 8 + col;
+        var (dispR, dispC) = ChessToDisplayCoords((int)pos.File, pos.Rank);
+        int idx = dispR * 8 + dispC;
         if (idx >= 0 && idx < Squares.Count)
         {
             Squares[idx].IsInCheck = isInCheck;
@@ -529,7 +536,7 @@ public partial class GameViewModel : ObservableObject
         _moves.Clear();
         WhiteMovesHistory.Clear();
         BlackMovesHistory.Clear();
-        _lastOpponentMove = null;
+        _lastMoveCoordinates = null;
         _matchSaved = false;
         RefreshBoardFromEngine();
     }
@@ -588,6 +595,7 @@ public partial class GameViewModel : ObservableObject
     {
         if (IsModeSelectionVisible || IsSetupModalActive || _engine.IsGameOver || IsPromotionModalActive || IsVictoryModalActive) return;
 
+        // Blocco turni in modalità Online se non è il turno del colore assegnato
         if (CurrentGameMode == GameMode.P2P && _engine.Turn != _localAssignedPlayer) return;
 
         if (_selectedSquare == null)
@@ -641,7 +649,7 @@ public partial class GameViewModel : ObservableObject
             {
                 string moveRecord = $"{from}-{to}";
                 _moves.Add(moveRecord);
-                RecordMoveInHistory(from, to, isWhiteTurn: wasWhite, isOpponent: false);
+                RecordMoveInHistory(from, to, isWhiteTurn: wasWhite);
 
                 if (CurrentGameMode == GameMode.P2P)
                 {
@@ -666,9 +674,8 @@ public partial class GameViewModel : ObservableObject
         var destinations = _engine.GetLegalDestinations(fromCoord);
         foreach (var pos in destinations)
         {
-            int col = (int)pos.File;
-            int row = 8 - pos.Rank;
-            int idx = row * 8 + col;
+            var (dispR, dispC) = ChessToDisplayCoords((int)pos.File, pos.Rank);
+            int idx = dispR * 8 + dispC;
             if (idx >= 0 && idx < Squares.Count)
             {
                 Squares[idx].IsTargetMove = true;
@@ -687,7 +694,7 @@ public partial class GameViewModel : ObservableObject
         {
             string moveRecord = $"{_pendingFromSquare}-{toSquare}={promo}";
             _moves.Add(moveRecord);
-            RecordMoveInHistory(_pendingFromSquare, toSquare, isWhiteTurn: wasWhite, isOpponent: false);
+            RecordMoveInHistory(_pendingFromSquare, toSquare, isWhiteTurn: wasWhite);
 
             if (CurrentGameMode == GameMode.P2P)
             {
@@ -696,9 +703,10 @@ public partial class GameViewModel : ObservableObject
 
             if (toSquare.Length == 2)
             {
-                int col = toSquare[0] - 'a';
-                int row = 8 - (toSquare[1] - '0');
-                int idx = row * 8 + col;
+                int file = toSquare[0] - 'a';
+                int rank = toSquare[1] - '0';
+                var (dispR, dispC) = ChessToDisplayCoords(file, rank);
+                int idx = dispR * 8 + dispC;
                 if (idx >= 0 && idx < Squares.Count)
                 {
                     Squares[idx].IsPromoted = true;
@@ -739,7 +747,7 @@ public partial class GameViewModel : ObservableObject
                                     if (_engine.TryMove(from, to))
                                     {
                                         _moves.Add($"{from}-{to}");
-                                        RecordMoveInHistory(from, to, isWhiteTurn: false, isOpponent: true);
+                                        RecordMoveInHistory(from, to, isWhiteTurn: false);
                                         RefreshBoardFromEngine();
                                         return;
                                     }
@@ -754,9 +762,9 @@ public partial class GameViewModel : ObservableObject
 
     private string GetCoord(ChessSquare sq)
     {
-        char file = (char)('a' + sq.Column);
-        int rank = 8 - sq.Row;
-        return $"{file}{rank}";
+        var (file, rank) = DisplayToChessCoords(sq.Row, sq.Column);
+        char fileChar = (char)('a' + file);
+        return $"{fileChar}{rank}";
     }
 
     // --- SETUP LOCALE ---
@@ -791,7 +799,7 @@ public partial class GameViewModel : ObservableObject
         _moves.Clear();
         WhiteMovesHistory.Clear();
         BlackMovesHistory.Clear();
-        _lastOpponentMove = null;
+        _lastMoveCoordinates = null;
         _matchSaved = false;
         RefreshBoardFromEngine();
     }
@@ -804,7 +812,7 @@ public partial class GameViewModel : ObservableObject
         _moves.Clear();
         WhiteMovesHistory.Clear();
         BlackMovesHistory.Clear();
-        _lastOpponentMove = null;
+        _lastMoveCoordinates = null;
         _matchSaved = false;
         CanStartMatch = false;
         DrawResultText = string.Empty;

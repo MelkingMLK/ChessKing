@@ -98,7 +98,7 @@
             </Grid>
         </Border>
 
-        <!-- CONTENUTO PRINCIPALE -->
+        <!-- CONTENUTO PRINCIPALE (COLONNA 1) -->
         <Grid Grid.Column="1">
             
             <!-- 1. VISTA PLAY -->
@@ -195,22 +195,11 @@
 
                 <!-- VISTA TAVOLO DI GIOCO -->
                 <Grid IsVisible="{Binding GameBoard.IsBoardViewVisible}">
-                    <Grid ColumnDefinitions="210, *, 330">
+                    <Grid ColumnDefinitions="*, 380">
                         
-                        <!-- 1. PANNELLO MOSSE E COORDINATE (COLONNA SINISTRA) -->
-                        <Border Grid.Column="0" Background="#3D314A" CornerRadius="6" BorderBrush="#684756" BorderThickness="1" Margin="0,0,12,0" Padding="12">
-                            <Grid RowDefinitions="Auto, *, Auto, *">
-                                <TextBlock Grid.Row="0" Text="MOSSE BIANCO" FontSize="12" FontWeight="Black" Foreground="#AB8476" Margin="0,0,0,4"/>
-                                <ListBox Grid.Row="1" ItemsSource="{Binding GameBoard.WhiteMovesHistory}" Background="#1A1423" Foreground="White" FontSize="11" CornerRadius="4" Margin="0,0,0,10"/>
-
-                                <TextBlock Grid.Row="2" Text="MOSSE NERO" FontSize="12" FontWeight="Black" Foreground="#AB8476" Margin="0,0,0,4"/>
-                                <ListBox Grid.Row="3" ItemsSource="{Binding GameBoard.BlackMovesHistory}" Background="#1A1423" Foreground="White" FontSize="11" CornerRadius="4"/>
-                            </Grid>
-                        </Border>
-
-                        <!-- 2. SCACCHIERA CENTRALE E ISPEZIONE MOSSA AVVERSARIO -->
-                        <Grid Grid.Column="1" RowDefinitions="*, Auto" HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <Border Grid.Row="0" BorderBrush="#684756" BorderThickness="4" CornerRadius="2">
+                       <!-- COLONNA SINISTRA: SCACCHIERA AMPIA AL CENTRO SENZA PULSANTI -->
+                        <Viewbox Grid.Column="0" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <Border BorderBrush="#684756" BorderThickness="4" CornerRadius="2">
                                 <ItemsControl ItemsSource="{Binding GameBoard.Squares}">
                                     <ItemsControl.ItemsPanel>
                                         <ItemsPanelTemplate>
@@ -224,8 +213,18 @@
                                                     CommandParameter="{Binding}"
                                                     Padding="0" Margin="0" BorderThickness="0" CornerRadius="0">
                                                 <Panel Width="65" Height="65">
+                                                    <!-- Sfondo Naturale Scacchiera -->
                                                     <Rectangle Fill="{Binding BackgroundBrush}"/>
-                                                    <Rectangle Fill="#684756" Opacity="0.5" IsVisible="{Binding IsSelected}"/>
+
+                                                    <!-- CORNER MARKERS DISCRETI PER L'ULTIMA MOSSA -->
+                                                    <Canvas Width="65" Height="65" IsVisible="{Binding IsLastMoveHighlight}" IsHitTestVisible="False">
+                                                        <Path Data="M 3,11 L 3,3 L 11,3" Stroke="#AB8476" StrokeThickness="2.5" StrokeLineCap="Round" StrokeJoin="Miter"/>
+                                                        <Path Data="M 54,3 L 62,3 L 62,11" Stroke="#AB8476" StrokeThickness="2.5" StrokeLineCap="Round" StrokeJoin="Miter"/>
+                                                        <Path Data="M 3,54 L 3,62 L 11,62" Stroke="#AB8476" StrokeThickness="2.5" StrokeLineCap="Round" StrokeJoin="Miter"/>
+                                                        <Path Data="M 54,62 L 62,62 L 62,54" Stroke="#AB8476" StrokeThickness="2.5" StrokeLineCap="Round" StrokeJoin="Miter"/>
+                                                    </Canvas>
+
+                                                    <Rectangle Fill="#684756" Opacity="0.45" IsVisible="{Binding IsSelected}"/>
                                                     <Rectangle Fill="#FF3333" Opacity="0.45" IsVisible="{Binding IsInCheck}"/>
                                                     <Rectangle Fill="#880000" Opacity="0.7" IsVisible="{Binding IsCheckmated}"/>
 
@@ -259,98 +258,110 @@
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
                             </Border>
+                        </Viewbox>
 
-                            <!-- PULSANTE VEDI MOSSA AVVERSARIO SOTTO LA SCACCHIERA -->
-                            <Button Grid.Row="1" Content="⏮ Vedi Mossa Avversario" 
-                                    Command="{Binding GameBoard.InspectLastOpponentMoveCommand}"
-                                    Background="#96705B" Foreground="White" FontWeight="Bold" FontSize="12"
-                                    HorizontalAlignment="Center" Padding="14,6" Margin="0,10,0,0" CornerRadius="4"/>
-                        </Grid>
-
-                        <!-- 3. PANNELLO LATERALE DESTRO (OROLOGI, CATTURATI E COMANDI) -->
-                        <Border Grid.Column="2" Background="#3D314A" CornerRadius="6" BorderBrush="#684756" BorderThickness="1" Margin="12,0,0,0" Padding="18">
-                            <Grid RowDefinitions="Auto, Auto, *, Auto">
+                        <!-- COLONNA DESTRA: PANNELLO DI CONTROLLO UNIFICATO -->
+                        <Border Grid.Column="1" Background="#3D314A" CornerRadius="6" BorderBrush="#684756" BorderThickness="1" Margin="20,0,0,0" Padding="16">
+                            <Grid RowDefinitions="Auto, Auto, Auto, *, Auto">
+                                <!-- Intestazione e Uscita -->
                                 <Grid Grid.Row="0" ColumnDefinitions="*, Auto" Margin="0,0,0,6">
                                     <TextBlock Grid.Column="0" Text="PARTITA IN CORSO" FontSize="14" FontWeight="Black" Foreground="#AB8476" VerticalAlignment="Center"/>
                                     <Button Grid.Column="1" Content="✕ Esci" Command="{Binding GameBoard.BackToModeSelectionCommand}" Background="#684756" Foreground="White" FontSize="11" Padding="8,4" CornerRadius="3"/>
                                 </Grid>
-                                <Separator Grid.Row="1" Background="#684756" Margin="0,0,0,12"/>
+                                <Separator Grid.Row="1" Background="#684756" Margin="0,0,0,10"/>
                                 
-                                <StackPanel Grid.Row="2" Spacing="14">
-                                    <Border Background="#1A1423" CornerRadius="6" Padding="14" BorderBrush="#684756" BorderThickness="1.5">
-                                        <StackPanel Spacing="4" HorizontalAlignment="Center">
-                                            <TextBlock Text="TURNO ATTUALE" FontSize="11" FontWeight="Bold" Foreground="#AB8476" HorizontalAlignment="Center"/>
-                                            <TextBlock Text="{Binding GameBoard.ActivePlayerName}" FontSize="24" FontWeight="Black" Foreground="White" TextAlignment="Center" TextWrapping="Wrap"/>
-                                            <TextBlock Text="{Binding GameBoard.ActivePlayerColorTag}" FontSize="13" FontWeight="SemiBold" Foreground="#AB8476" HorizontalAlignment="Center"/>
-                                        </StackPanel>
-                                    </Border>
+                                <!-- Turno Attuale -->
+                                <Border Grid.Row="2" Background="#1A1423" CornerRadius="6" Padding="10" BorderBrush="#684756" BorderThickness="1.5" Margin="0,0,0,10">
+                                    <StackPanel Spacing="3" HorizontalAlignment="Center">
+                                        <TextBlock Text="TURNO ATTUALE" FontSize="10" FontWeight="Bold" Foreground="#AB8476" HorizontalAlignment="Center"/>
+                                        <TextBlock Text="{Binding GameBoard.ActivePlayerName}" FontSize="20" FontWeight="Black" Foreground="White" TextAlignment="Center" TextWrapping="Wrap"/>
+                                        <TextBlock Text="{Binding GameBoard.ActivePlayerColorTag}" FontSize="12" FontWeight="SemiBold" Foreground="#AB8476" HorizontalAlignment="Center"/>
+                                    </StackPanel>
+                                </Border>
 
-                                    <!-- BLOCCHI BIANCO E NERO CON CATTURATI (MAX 4 + BADGE SCARTO) -->
-                                    <Grid ColumnDefinitions="*, 8, *">
-                                        <!-- BIANCO -->
-                                        <Border Grid.Column="0" Background="#1A1423" CornerRadius="4" Padding="10">
-                                            <StackPanel Spacing="6" HorizontalAlignment="Center">
+                                <!-- Area Centrale: Timer/Catturati + Liste Mosse Bianco e Nero -->
+                                <Grid Grid.Row="3" RowDefinitions="Auto, *">
+                                    <!-- Timer e Catturati Compatto (FIFO max 4) -->
+                                    <Grid Grid.Row="0" ColumnDefinitions="*, 8, *" Margin="0,0,0,10">
+                                        <!-- Bianco -->
+                                        <Border Grid.Column="0" Background="#1A1423" CornerRadius="4" Padding="8">
+                                            <StackPanel Spacing="4" HorizontalAlignment="Center">
                                                 <TextBlock Text="BIANCO" FontSize="10" FontWeight="Bold" Foreground="#AB8476" HorizontalAlignment="Center"/>
-                                                <TextBlock Text="{Binding GameBoard.WhitePlayerName}" FontSize="12" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                                                <TextBlock Text="{Binding GameBoard.WhiteTimerText}" FontSize="18" FontWeight="Heavy" Foreground="White" HorizontalAlignment="Center"/>
-                                                
-                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="4" Margin="0,4,0,0">
+                                                <TextBlock Text="{Binding GameBoard.WhitePlayerName}" FontSize="11" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Text="{Binding GameBoard.WhiteTimerText}" FontSize="16" FontWeight="Heavy" Foreground="White" HorizontalAlignment="Center"/>
+                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="3">
                                                     <ItemsControl ItemsSource="{Binding GameBoard.DisplayedWhiteCaptured}">
                                                         <ItemsControl.ItemsPanel>
                                                             <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="2"/></ItemsPanelTemplate>
                                                         </ItemsControl.ItemsPanel>
                                                         <ItemsControl.ItemTemplate>
                                                             <DataTemplate>
-                                                                <TextBlock Text="{Binding}" FontSize="20" Foreground="#8675A9" VerticalAlignment="Center"/>
+                                                                <TextBlock Text="{Binding}" FontSize="18" Foreground="#8675A9" VerticalAlignment="Center"/>
                                                             </DataTemplate>
                                                         </ItemsControl.ItemTemplate>
                                                     </ItemsControl>
-
-                                                    <Border Background="#684756" CornerRadius="8" Padding="4,1" IsVisible="{Binding GameBoard.HasWhiteOverflow}" VerticalAlignment="Center">
-                                                        <TextBlock Text="{Binding GameBoard.WhiteCapturedOverflowBadge}" FontSize="10" FontWeight="Bold" Foreground="White"/>
+                                                    <Border Background="#684756" CornerRadius="6" Padding="4,1" IsVisible="{Binding GameBoard.HasWhiteOverflow}" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding GameBoard.WhiteCapturedOverflowBadge}" FontSize="9" FontWeight="Bold" Foreground="White"/>
                                                     </Border>
-
-                                                    <TextBlock Text="{Binding GameBoard.WhiteScoreDelta}" FontSize="12" FontWeight="Black" Foreground="#4CAF50" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="{Binding GameBoard.WhiteScoreDelta}" FontSize="11" FontWeight="Black" Foreground="#4CAF50" VerticalAlignment="Center"/>
                                                 </StackPanel>
                                             </StackPanel>
                                         </Border>
 
-                                        <!-- NERO -->
-                                        <Border Grid.Column="2" Background="#1A1423" CornerRadius="4" Padding="10">
-                                            <StackPanel Spacing="6" HorizontalAlignment="Center">
+                                        <!-- Nero -->
+                                        <Border Grid.Column="2" Background="#1A1423" CornerRadius="4" Padding="8">
+                                            <StackPanel Spacing="4" HorizontalAlignment="Center">
                                                 <TextBlock Text="NERO" FontSize="10" FontWeight="Bold" Foreground="#AB8476" HorizontalAlignment="Center"/>
-                                                <TextBlock Text="{Binding GameBoard.BlackPlayerName}" FontSize="12" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                                                <TextBlock Text="{Binding GameBoard.BlackTimerText}" FontSize="18" FontWeight="Heavy" Foreground="White" HorizontalAlignment="Center"/>
-                                                
-                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="4" Margin="0,4,0,0">
+                                                <TextBlock Text="{Binding GameBoard.BlackPlayerName}" FontSize="11" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Text="{Binding GameBoard.BlackTimerText}" FontSize="16" FontWeight="Heavy" Foreground="White" HorizontalAlignment="Center"/>
+                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="3">
                                                     <ItemsControl ItemsSource="{Binding GameBoard.DisplayedBlackCaptured}">
                                                         <ItemsControl.ItemsPanel>
                                                             <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="2"/></ItemsPanelTemplate>
                                                         </ItemsControl.ItemsPanel>
                                                         <ItemsControl.ItemTemplate>
                                                             <DataTemplate>
-                                                                <TextBlock Text="{Binding}" FontSize="20" Foreground="#AB8476" VerticalAlignment="Center"/>
+                                                                <TextBlock Text="{Binding}" FontSize="18" Foreground="#AB8476" VerticalAlignment="Center"/>
                                                             </DataTemplate>
                                                         </ItemsControl.ItemTemplate>
                                                     </ItemsControl>
-
-                                                    <Border Background="#684756" CornerRadius="8" Padding="4,1" IsVisible="{Binding GameBoard.HasBlackOverflow}" VerticalAlignment="Center">
-                                                        <TextBlock Text="{Binding GameBoard.BlackCapturedOverflowBadge}" FontSize="10" FontWeight="Bold" Foreground="White"/>
+                                                    <Border Background="#684756" CornerRadius="6" Padding="4,1" IsVisible="{Binding GameBoard.HasBlackOverflow}" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding GameBoard.BlackCapturedOverflowBadge}" FontSize="9" FontWeight="Bold" Foreground="White"/>
                                                     </Border>
-
-                                                    <TextBlock Text="{Binding GameBoard.BlackScoreDelta}" FontSize="12" FontWeight="Black" Foreground="#4CAF50" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="{Binding GameBoard.BlackScoreDelta}" FontSize="11" FontWeight="Black" Foreground="#4CAF50" VerticalAlignment="Center"/>
                                                 </StackPanel>
                                             </StackPanel>
                                         </Border>
                                     </Grid>
 
-                                    <TextBlock Text="{Binding GameBoard.StatusMessage}" Foreground="#AAAABB" FontSize="12" TextAlignment="Center" TextWrapping="Wrap"/>
-                                </StackPanel>
+                                    <!-- Due Schermate Mosse a Destra Affiancate -->
+                                    <Grid Grid.Row="1" ColumnDefinitions="*, 8, *">
+                                        <!-- Lista Mosse Bianco -->
+                                        <Border Grid.Column="0" Background="#1A1423" CornerRadius="4" Padding="6">
+                                            <Grid RowDefinitions="Auto, *">
+                                                <TextBlock Grid.Row="0" Text="Mosse Bianco" FontSize="11" FontWeight="Bold" Foreground="#AB8476" Margin="0,0,0,4" HorizontalAlignment="Center"/>
+                                                <ListBox Grid.Row="1" ItemsSource="{Binding GameBoard.WhiteMovesHistory}" Background="Transparent" Foreground="White" FontSize="11"/>
+                                            </Grid>
+                                        </Border>
 
-                                <Button Grid.Row="3" Content="Nuova Partita / Reset" 
-                                        Command="{Binding GameBoard.ResetGameCommand}" 
-                                        Background="#96705B" Foreground="White" FontWeight="Bold" 
-                                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="10" CornerRadius="4"/>
+                                        <!-- Lista Mosse Nero -->
+                                        <Border Grid.Column="2" Background="#1A1423" CornerRadius="4" Padding="6">
+                                            <Grid RowDefinitions="Auto, *">
+                                                <TextBlock Grid.Row="0" Text="Mosse Nero" FontSize="11" FontWeight="Bold" Foreground="#AB8476" Margin="0,0,0,4" HorizontalAlignment="Center"/>
+                                                <ListBox Grid.Row="1" ItemsSource="{Binding GameBoard.BlackMovesHistory}" Background="Transparent" Foreground="White" FontSize="11"/>
+                                            </Grid>
+                                        </Border>
+                                    </Grid>
+                                </Grid>
+
+                                <!-- Messaggio di Stato e Pulsante Reset -->
+                                <StackPanel Grid.Row="4" Spacing="8" Margin="0,10,0,0">
+                                    <TextBlock Text="{Binding GameBoard.StatusMessage}" Foreground="#AAAABB" FontSize="11" TextAlignment="Center" TextWrapping="Wrap"/>
+                                    <Button Content="Nuova Partita / Reset" 
+                                            Command="{Binding GameBoard.ResetGameCommand}" 
+                                            Background="#96705B" Foreground="White" FontWeight="Bold" 
+                                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="8" CornerRadius="4"/>
+                                </StackPanel>
                             </Grid>
                         </Border>
                     </Grid>
@@ -403,8 +414,8 @@
                         </Border>
                     </Border>
 
-                </Grid>
-            </Grid>
+                </Grid> <!-- Fine GameBoard.IsBoardViewVisible -->
+            </Grid> <!-- Fine IsPlayViewVisible -->
 
             <!-- 2. VISTA STRATEGY -->
             <Grid IsVisible="{Binding IsStrategyViewVisible}" Margin="20">
@@ -631,6 +642,6 @@
                 </Border>
             </Grid>
 
-        </Grid>
-    </Grid>
+        </Grid> <!-- Fine Colonna 1 -->
+    </Grid> <!-- Fine Root Grid -->
 </Window>
