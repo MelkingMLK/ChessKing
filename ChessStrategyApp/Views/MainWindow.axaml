@@ -45,20 +45,14 @@
             <Setter Property="RenderTransformOrigin" Value="50%,50%"/>
             <Style.Animations>
                 <Animation Duration="0:0:0.4" FillMode="Forward">
-                    <KeyFrame KeyTime="0:0:0.0">
-                        <Setter Property="(ScaleTransform.ScaleX)" Value="0.2"/>
-                        <Setter Property="(ScaleTransform.ScaleY)" Value="0.2"/>
-                        <Setter Property="Opacity" Value="0.0"/>
-                    </KeyFrame>
-                    <KeyFrame KeyTime="0:0:0.25">
-                        <Setter Property="(ScaleTransform.ScaleX)" Value="1.3"/>
-                        <Setter Property="(ScaleTransform.ScaleY)" Value="1.3"/>
-                        <Setter Property="Opacity" Value="1.0"/>
-                    </KeyFrame>
-                    <KeyFrame KeyTime="0:0:0.4">
-                        <Setter Property="(ScaleTransform.ScaleX)" Value="1.0"/>
-                        <Setter Property="(ScaleTransform.ScaleY)" Value="1.0"/>
-                    </KeyFrame>
+                    <KeyFrame KeyTime="0:0:0.0"><Setter Property="(ScaleTransform.ScaleX)" Value="0.2"/>
+                    <Setter Property="(ScaleTransform.ScaleY)" Value="0.2"/>
+                    <Setter Property="Opacity" Value="0.0"/></KeyFrame>
+                    <KeyFrame KeyTime="0:0:0.25"><Setter Property="(ScaleTransform.ScaleX)" Value="1.3"/>
+                    <Setter Property="(ScaleTransform.ScaleY)" Value="1.3"/>
+                    <Setter Property="Opacity" Value="1.0"/></KeyFrame>
+                    <KeyFrame KeyTime="0:0:0.4"><Setter Property="(ScaleTransform.ScaleX)" Value="1.0"/>
+                    <Setter Property="(ScaleTransform.ScaleY)" Value="1.0"/></KeyFrame>
                 </Animation>
             </Style.Animations>
         </Style>
@@ -92,13 +86,20 @@
                             HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
                             Padding="12" FontSize="14" FontWeight="Bold"
                             Foreground="White" Background="#96705B" CornerRadius="4"/>
+
+                    <Button Content="PROFILE" 
+                            Command="{Binding SwitchViewCommand}" 
+                            CommandParameter="Profile"
+                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                            Padding="12" FontSize="14" FontWeight="Bold"
+                            Foreground="White" Background="#96705B" CornerRadius="4"/>
                 </StackPanel>
                 
                 <TextBlock Grid.Row="2" Text="v1.0" Foreground="#AB8476" FontSize="11" HorizontalAlignment="Center"/>
             </Grid>
         </Border>
 
-        <!-- CONTENUTO PRINCIPALE (COLONNA 1) -->
+        <!-- CONTENUTO PRINCIPALE -->
         <Grid Grid.Column="1">
             
             <!-- 1. VISTA PLAY -->
@@ -106,50 +107,80 @@
                 
                 <!-- HUB SCELTA MODALITÀ -->
                 <Grid IsVisible="{Binding GameBoard.IsModeSelectionVisible}">
-                    <Border Background="#3D314A" CornerRadius="8" Padding="35" BorderBrush="#684756" BorderThickness="2" MaxWidth="920" MaxHeight="580" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Border Background="#3D314A" CornerRadius="8" Padding="35" BorderBrush="#684756" BorderThickness="2" MaxWidth="960" MaxHeight="600" HorizontalAlignment="Center" VerticalAlignment="Center">
                         <Grid RowDefinitions="Auto, Auto, *">
                             <TextBlock Grid.Row="0" Text="SELEZIONA MODALITÀ DI GIOCO" FontSize="26" FontWeight="Black" Foreground="#AB8476" HorizontalAlignment="Center" Margin="0,0,0,8"/>
                             <TextBlock Grid.Row="1" Text="Scegli la tipologia di scontro o allenamento per questa sessione" FontSize="14" Foreground="#AAAABB" HorizontalAlignment="Center" Margin="0,0,0,30"/>
 
-                            <Grid Grid.Row="2" ColumnDefinitions="*, 20, *, 20, *">
+                            <Grid Grid.Row="2" ColumnDefinitions="*, 15, *, 15, *">
+                                
                                 <!-- CARD LOCALE -->
-                                <Border Grid.Column="0" Background="#1A1423" CornerRadius="6" BorderBrush="#684756" BorderThickness="1" Padding="20">
+                                <Border Grid.Column="0" Background="#1A1423" CornerRadius="6" BorderBrush="#684756" BorderThickness="1" Padding="16">
                                     <Grid RowDefinitions="Auto, *, Auto">
-                                        <TextBlock Grid.Row="0" Text="👥 LOCALE" FontSize="20" FontWeight="Black" Foreground="White" HorizontalAlignment="Center" Margin="0,10,0,10"/>
+                                        <TextBlock Grid.Row="0" Text="👥 LOCALE" FontSize="18" FontWeight="Black" Foreground="White" HorizontalAlignment="Center" Margin="0,5,0,8"/>
                                         <TextBlock Grid.Row="1" Text="Pass and Play sullo stesso monitor. Sorteggio integrato dei colori, orologi sincronizzati e storico." 
-                                                   Foreground="#AB8476" FontSize="12" TextWrapping="Wrap" TextAlignment="Center" Margin="0,10"/>
-                                        <Button Grid.Row="2" Content="GIOCA IN LOCALE" 
+                                                   Foreground="#AB8476" FontSize="11" TextWrapping="Wrap" TextAlignment="Center" Margin="0,5"/>
+                                        <Button Grid.Row="2" Content="GIOCA LOCALE" 
                                                 Command="{Binding GameBoard.SelectLocalModeCommand}"
                                                 Background="#96705B" Foreground="White" FontWeight="Bold"
-                                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="12" CornerRadius="4"/>
+                                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="10" CornerRadius="4"/>
                                     </Grid>
                                 </Border>
 
                                 <!-- CARD ONLINE ROOMS -->
-                                <Border Grid.Column="2" Background="#1A1423" CornerRadius="6" BorderBrush="#684756" BorderThickness="1" Padding="20">
+                                <Border Grid.Column="2" Background="#1A1423" CornerRadius="6" BorderBrush="#684756" BorderThickness="1" Padding="16">
                                     <Grid RowDefinitions="Auto, *, Auto">
-                                        <TextBlock Grid.Row="0" Text="🌐 ONLINE ROOMS" FontSize="20" FontWeight="Black" Foreground="White" HorizontalAlignment="Center" Margin="0,10,0,10"/>
-                                        <TextBlock Grid.Row="1" Text="Stanze private via WebSockets/HTTPS. Bypass totale di firewall universitari e NAT con sorteggio colori casuale." 
-                                                   Foreground="#AB8476" FontSize="12" TextWrapping="Wrap" TextAlignment="Center" Margin="0,10"/>
-                                        <Button Grid.Row="2" Content="MODALITÀ ONLINE" 
+                                        <TextBlock Grid.Row="0" Text="🌐 ONLINE ROOMS" FontSize="18" FontWeight="Black" Foreground="White" HorizontalAlignment="Center" Margin="0,5,0,8"/>
+                                        <TextBlock Grid.Row="1" Text="Stanze private via WebSockets con SignalR. Sorteggio colori 50/50 e bypass NAT." 
+                                                   Foreground="#AB8476" FontSize="11" TextWrapping="Wrap" TextAlignment="Center" Margin="0,5"/>
+                                        <Button Grid.Row="2" Content="ONLINE" 
                                                 Command="{Binding GameBoard.SelectP2PModeCommand}"
                                                 Background="#684756" Foreground="White" FontWeight="Bold"
-                                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="12" CornerRadius="4"/>
+                                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="10" CornerRadius="4"/>
                                     </Grid>
                                 </Border>
 
-                                <!-- CARD SOLO -->
-                                <Border Grid.Column="4" Background="#1A1423" CornerRadius="6" BorderBrush="#684756" BorderThickness="1" Padding="20">
-                                    <Grid RowDefinitions="Auto, *, Auto">
-                                        <TextBlock Grid.Row="0" Text="🤖 SOLO / BOT" FontSize="20" FontWeight="Black" Foreground="White" HorizontalAlignment="Center" Margin="0,10,0,10"/>
-                                        <TextBlock Grid.Row="1" Text="Allenati in solitaria contro l'algoritmo di risposta automatico. Ideale per testare repertori e aperture." 
-                                                   Foreground="#AB8476" FontSize="12" TextWrapping="Wrap" TextAlignment="Center" Margin="0,10"/>
-                                        <Button Grid.Row="2" Content="ALLENAMENTO" 
-                                                Command="{Binding GameBoard.SelectSoloModeCommand}"
-                                                Background="#96705B" Foreground="White" FontWeight="Bold"
-                                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="12" CornerRadius="4"/>
+                                <!-- CARD CAMPAGNA & BOT LADDER -->
+                                <Border Grid.Column="4" Background="#1A1423" CornerRadius="6" BorderBrush="#684756" BorderThickness="1" Padding="16">
+                                    <Grid RowDefinitions="Auto, *, Auto, Auto">
+                                        <TextBlock Grid.Row="0" Text="🤖 SFIDA I BOT" FontSize="18" FontWeight="Black" Foreground="White" HorizontalAlignment="Center" Margin="0,5,0,6"/>
+                                        
+                                        <!-- Scelta Campagna Progressiva -->
+                                        <StackPanel Grid.Row="1" Spacing="6" Margin="0,4,0,10">
+                                            <Button Content="{Binding ProfileVm.Profile.EloSoloCampaign, StringFormat='🧗 Campagna (ELO {0})'}" 
+                                                    Command="{Binding LaunchCampaignCommand}"
+                                                    Background="#96705B" Foreground="White" FontWeight="Bold"
+                                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="10" CornerRadius="4"/>
+                                            <TextBlock Text="{Binding ProfileVm.Profile.CurrentWinStreak, StringFormat='Streak: {0} 🔥'}" FontSize="11" Foreground="#FF9800" HorizontalAlignment="Center"/>
+                                        </StackPanel>
+
+                                        <Separator Grid.Row="2" Background="#684756" Margin="0,0,0,10"/>
+
+                                        <!-- Scelta Bot Ladder Tier Fisso con Sblocco Dinamico -->
+                                        <!-- Scelta Bot Ladder Tier Fisso con Sblocco Dinamico -->
+                                        <StackPanel Grid.Row="3" Spacing="8">
+                                            <Grid ColumnDefinitions="Auto, *">
+                                                <TextBlock Grid.Column="0" Text="Tier Bot:" Foreground="#AB8476" FontWeight="Bold" FontSize="11" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                                <ComboBox Grid.Column="1" 
+                                                          ItemsSource="{Binding AvailableLadderTiers}" 
+                                                          SelectedItem="{Binding SelectedLadderElo, Mode=TwoWay}" 
+                                                          HorizontalAlignment="Stretch" 
+                                                          Background="#3D314A" Foreground="White" BorderBrush="#684756">
+                                                    <ComboBox.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <TextBlock Text="{Binding StringFormat='ELO {0}'}" Foreground="White" FontWeight="SemiBold"/>
+                                                        </DataTemplate>
+                                                    </ComboBox.ItemTemplate>
+                                                </ComboBox>
+                                            </Grid>
+                                            <Button Content="Sfida Tier" 
+                                                    Command="{Binding LaunchBotLadderCommand}"
+                                                    Background="#684756" Foreground="White" FontWeight="Bold"
+                                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="8" CornerRadius="4"/>
+                                        </StackPanel>
                                     </Grid>
                                 </Border>
+
                             </Grid>
                         </Grid>
                     </Border>
@@ -197,7 +228,7 @@
                 <Grid IsVisible="{Binding GameBoard.IsBoardViewVisible}">
                     <Grid ColumnDefinitions="*, 380">
                         
-                       <!-- COLONNA SINISTRA: SCACCHIERA AMPIA AL CENTRO SENZA PULSANTI -->
+                        <!-- SCACCHIERA AMPIA CENTRALE (CON CORNER MARKERS) -->
                         <Viewbox Grid.Column="0" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center">
                             <Border BorderBrush="#684756" BorderThickness="4" CornerRadius="2">
                                 <ItemsControl ItemsSource="{Binding GameBoard.Squares}">
@@ -213,10 +244,9 @@
                                                     CommandParameter="{Binding}"
                                                     Padding="0" Margin="0" BorderThickness="0" CornerRadius="0">
                                                 <Panel Width="65" Height="65">
-                                                    <!-- Sfondo Naturale Scacchiera -->
                                                     <Rectangle Fill="{Binding BackgroundBrush}"/>
 
-                                                    <!-- CORNER MARKERS DISCRETI PER L'ULTIMA MOSSA -->
+                                                    <!-- CORNER MARKERS PER L'ULTIMA MOSSA -->
                                                     <Canvas Width="65" Height="65" IsVisible="{Binding IsLastMoveHighlight}" IsHitTestVisible="False">
                                                         <Path Data="M 3,11 L 3,3 L 11,3" Stroke="#AB8476" StrokeThickness="2.5" StrokeLineCap="Round" StrokeJoin="Miter"/>
                                                         <Path Data="M 54,3 L 62,3 L 62,11" Stroke="#AB8476" StrokeThickness="2.5" StrokeLineCap="Round" StrokeJoin="Miter"/>
@@ -260,17 +290,15 @@
                             </Border>
                         </Viewbox>
 
-                        <!-- COLONNA DESTRA: PANNELLO DI CONTROLLO UNIFICATO -->
+                        <!-- PANNELLO LATERALE DI CONTROLLO UNIFICATO -->
                         <Border Grid.Column="1" Background="#3D314A" CornerRadius="6" BorderBrush="#684756" BorderThickness="1" Margin="20,0,0,0" Padding="16">
                             <Grid RowDefinitions="Auto, Auto, Auto, *, Auto">
-                                <!-- Intestazione e Uscita -->
                                 <Grid Grid.Row="0" ColumnDefinitions="*, Auto" Margin="0,0,0,6">
                                     <TextBlock Grid.Column="0" Text="PARTITA IN CORSO" FontSize="14" FontWeight="Black" Foreground="#AB8476" VerticalAlignment="Center"/>
                                     <Button Grid.Column="1" Content="✕ Esci" Command="{Binding GameBoard.BackToModeSelectionCommand}" Background="#684756" Foreground="White" FontSize="11" Padding="8,4" CornerRadius="3"/>
                                 </Grid>
                                 <Separator Grid.Row="1" Background="#684756" Margin="0,0,0,10"/>
                                 
-                                <!-- Turno Attuale -->
                                 <Border Grid.Row="2" Background="#1A1423" CornerRadius="6" Padding="10" BorderBrush="#684756" BorderThickness="1.5" Margin="0,0,0,10">
                                     <StackPanel Spacing="3" HorizontalAlignment="Center">
                                         <TextBlock Text="TURNO ATTUALE" FontSize="10" FontWeight="Bold" Foreground="#AB8476" HorizontalAlignment="Center"/>
@@ -279,9 +307,7 @@
                                     </StackPanel>
                                 </Border>
 
-                                <!-- Area Centrale: Timer/Catturati + Liste Mosse Bianco e Nero -->
                                 <Grid Grid.Row="3" RowDefinitions="Auto, *">
-                                    <!-- Timer e Catturati Compatto (FIFO max 4) -->
                                     <Grid Grid.Row="0" ColumnDefinitions="*, 8, *" Margin="0,0,0,10">
                                         <!-- Bianco -->
                                         <Border Grid.Column="0" Background="#1A1423" CornerRadius="4" Padding="8">
@@ -334,9 +360,8 @@
                                         </Border>
                                     </Grid>
 
-                                    <!-- Due Schermate Mosse a Destra Affiancate -->
+                                    <!-- Due Colonne Mosse Coordinate Affiancate -->
                                     <Grid Grid.Row="1" ColumnDefinitions="*, 8, *">
-                                        <!-- Lista Mosse Bianco -->
                                         <Border Grid.Column="0" Background="#1A1423" CornerRadius="4" Padding="6">
                                             <Grid RowDefinitions="Auto, *">
                                                 <TextBlock Grid.Row="0" Text="Mosse Bianco" FontSize="11" FontWeight="Bold" Foreground="#AB8476" Margin="0,0,0,4" HorizontalAlignment="Center"/>
@@ -344,7 +369,6 @@
                                             </Grid>
                                         </Border>
 
-                                        <!-- Lista Mosse Nero -->
                                         <Border Grid.Column="2" Background="#1A1423" CornerRadius="4" Padding="6">
                                             <Grid RowDefinitions="Auto, *">
                                                 <TextBlock Grid.Row="0" Text="Mosse Nero" FontSize="11" FontWeight="Bold" Foreground="#AB8476" Margin="0,0,0,4" HorizontalAlignment="Center"/>
@@ -354,7 +378,6 @@
                                     </Grid>
                                 </Grid>
 
-                                <!-- Messaggio di Stato e Pulsante Reset -->
                                 <StackPanel Grid.Row="4" Spacing="8" Margin="0,10,0,0">
                                     <TextBlock Text="{Binding GameBoard.StatusMessage}" Foreground="#AAAABB" FontSize="11" TextAlignment="Center" TextWrapping="Wrap"/>
                                     <Button Content="Nuova Partita / Reset" 
@@ -414,8 +437,8 @@
                         </Border>
                     </Border>
 
-                </Grid> <!-- Fine GameBoard.IsBoardViewVisible -->
-            </Grid> <!-- Fine IsPlayViewVisible -->
+                </Grid>
+            </Grid>
 
             <!-- 2. VISTA STRATEGY -->
             <Grid IsVisible="{Binding IsStrategyViewVisible}" Margin="20">
@@ -642,6 +665,126 @@
                 </Border>
             </Grid>
 
-        </Grid> <!-- Fine Colonna 1 -->
-    </Grid> <!-- Fine Root Grid -->
+            <!-- 4. VISTA PROFILE -->
+            <Grid IsVisible="{Binding IsProfileViewVisible}" Margin="20">
+                <Border Background="#3D314A" CornerRadius="8" Padding="25" BorderBrush="#684756" BorderThickness="2" MaxWidth="1050" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Grid RowDefinitions="Auto, Auto, Auto, *">
+                        <TextBlock Grid.Row="0" Text="PROFILO GIOCATORE &amp; RANKING" FontSize="22" FontWeight="Black" Foreground="#AB8476" HorizontalAlignment="Center" Margin="0,0,0,6"/>
+                        <Separator Grid.Row="1" Background="#684756" Margin="0,0,0,15"/>
+
+                        <!-- SEZIONE NICKNAME MODIFICABILE -->
+                        <Border Grid.Row="2" Background="#1A1423" CornerRadius="6" Padding="12" BorderBrush="#684756" BorderThickness="1" Margin="0,0,0,15">
+                            <Grid ColumnDefinitions="Auto, *, Auto, Auto" VerticalAlignment="Center">
+                                <TextBlock Grid.Column="0" Text="Nickname:" Foreground="#AB8476" FontWeight="Bold" FontSize="13" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                <TextBox Grid.Column="1" Text="{Binding ProfileVm.EditableNickname}" Background="#3D314A" Foreground="White" BorderBrush="#684756" FontSize="13" Margin="0,0,12,0"/>
+                                <Button Grid.Column="2" Content="💾 Salva" Command="{Binding ProfileVm.SaveNicknameCommand}" Background="#96705B" Foreground="White" FontWeight="Bold" Padding="12,6" CornerRadius="4"/>
+                                <TextBlock Grid.Column="3" Text="{Binding ProfileVm.SaveFeedback}" Foreground="#4CAF50" FontWeight="Bold" FontSize="12" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- CARDS METRICHE: CAMPAGNA SOLO | BOT LADDER | ONLINE -->
+                        <Grid Grid.Row="3" ColumnDefinitions="*, 15, *, 15, *">
+                            
+                            <!-- 1. CARD CAMPAGNA SOLO (PROGRESSIVA) -->
+                            <Border Grid.Column="0" Background="#1A1423" CornerRadius="6" Padding="16" BorderBrush="#684756" BorderThickness="1">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Text="🧗 CAMPAGNA SOLO" FontSize="14" FontWeight="Black" Foreground="#AB8476" HorizontalAlignment="Center"/>
+                                    <Separator Background="#684756"/>
+                                    
+                                    <StackPanel HorizontalAlignment="Center" Spacing="1">
+                                        <TextBlock Text="ELO CAMPAGNA" FontSize="10" FontWeight="Bold" Foreground="#AAAABB" HorizontalAlignment="Center"/>
+                                        <TextBlock Text="{Binding ProfileVm.Profile.EloSoloCampaign}" FontSize="32" FontWeight="Black" Foreground="#FFD500" HorizontalAlignment="Center"/>
+                                        <TextBlock Text="{Binding ProfileVm.Profile.CurrentWinStreak, StringFormat='Streak: {0} 🔥'}" FontSize="11" FontWeight="Bold" Foreground="#FF9800" HorizontalAlignment="Center"/>
+                                    </StackPanel>
+
+                                    <Grid ColumnDefinitions="*, *" Margin="0,5,0,0">
+                                        <StackPanel Grid.Column="0" Spacing="4">
+                                            <TextBlock Text="Partite:" Foreground="#AAAABB" FontSize="11"/>
+                                            <TextBlock Text="Vittorie:" Foreground="#4CAF50" FontSize="11" FontWeight="Bold"/>
+                                            <TextBlock Text="Patte:" Foreground="#FFD500" FontSize="11" FontWeight="Bold"/>
+                                            <TextBlock Text="Sconfitte:" Foreground="#FF5252" FontSize="11" FontWeight="Bold"/>
+                                            <TextBlock Text="Miglior Streak:" Foreground="#FF9800" FontSize="11" FontWeight="Bold"/>
+                                            <TextBlock Text="Win Rate:" Foreground="#AB8476" FontSize="11" FontWeight="Bold"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" HorizontalAlignment="Right" Spacing="4">
+                                            <TextBlock Text="{Binding ProfileVm.Profile.CampaignMatchesPlayed}" Foreground="White" FontSize="11"/>
+                                            <TextBlock Text="{Binding ProfileVm.Profile.CampaignWins}" Foreground="#4CAF50" FontSize="11" FontWeight="Bold"/>
+                                            <TextBlock Text="{Binding ProfileVm.Profile.CampaignDraws}" Foreground="#FFD500" FontSize="11" FontWeight="Bold"/>
+                                            <TextBlock Text="{Binding ProfileVm.Profile.CampaignLosses}" Foreground="#FF5252" FontSize="11" FontWeight="Bold"/>
+                                            <TextBlock Text="{Binding ProfileVm.Profile.BestWinStreak}" Foreground="#FF9800" FontSize="11" FontWeight="Bold"/>
+                                            <TextBlock Text="{Binding ProfileVm.Profile.CampaignWinRate, StringFormat='{}{0}%'}" Foreground="#AB8476" FontSize="11" FontWeight="Bold"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- 2. CARD BOT LADDER (TIER FISSO) -->
+                            <Border Grid.Column="2" Background="#1A1423" CornerRadius="6" Padding="16" BorderBrush="#684756" BorderThickness="1">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Text="🤖 BOT LADDER" FontSize="14" FontWeight="Black" Foreground="#AB8476" HorizontalAlignment="Center"/>
+                                    <Separator Background="#684756"/>
+                                    
+                                    <StackPanel HorizontalAlignment="Center" Spacing="1">
+                                        <TextBlock Text="MAX BOT SCONFITTO" FontSize="10" FontWeight="Bold" Foreground="#AAAABB" HorizontalAlignment="Center"/>
+                                        <TextBlock Text="{Binding ProfileVm.Profile.HighestBotDefeatedElo, StringFormat='ELO {0}'}" FontSize="28" FontWeight="Black" Foreground="#4CAF50" HorizontalAlignment="Center"/>
+                                        <TextBlock Text="Tier 200 - 2000" FontSize="11" Foreground="#AAAABB" HorizontalAlignment="Center"/>
+                                    </StackPanel>
+
+                                    <Grid ColumnDefinitions="*, *" Margin="0,5,0,0">
+                                        <StackPanel Grid.Column="0" Spacing="4">
+                                            <TextBlock Text="Partite:" Foreground="#AAAABB" FontSize="11"/>
+                                            <TextBlock Text="Vittorie:" Foreground="#4CAF50" FontSize="11" FontWeight="Bold"/>
+                                            <TextBlock Text="Patte:" Foreground="#FFD500" FontSize="11" FontWeight="Bold"/>
+                                            <TextBlock Text="Sconfitte:" Foreground="#FF5252" FontSize="11" FontWeight="Bold"/>
+                                            <TextBlock Text="Win Rate:" Foreground="#AB8476" FontSize="11" FontWeight="Bold"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" HorizontalAlignment="Right" Spacing="4">
+                                            <TextBlock Text="{Binding ProfileVm.Profile.BotLadderMatchesPlayed}" Foreground="White" FontSize="11"/>
+                                            <TextBlock Text="{Binding ProfileVm.Profile.BotLadderWins}" Foreground="#4CAF50" FontSize="11" FontWeight="Bold"/>
+                                            <TextBlock Text="{Binding ProfileVm.Profile.BotLadderDraws}" Foreground="#FFD500" FontSize="11" FontWeight="Bold"/>
+                                            <TextBlock Text="{Binding ProfileVm.Profile.BotLadderLosses}" Foreground="#FF5252" FontSize="11" FontWeight="Bold"/>
+                                            <TextBlock Text="{Binding ProfileVm.Profile.BotLadderWinRate, StringFormat='{}{0}%'}" Foreground="#AB8476" FontSize="11" FontWeight="Bold"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- 3. CARD ONLINE ROOMS -->
+                            <Border Grid.Column="4" Background="#1A1423" CornerRadius="6" Padding="16" BorderBrush="#684756" BorderThickness="1">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Text="🌐 ONLINE ROOMS" FontSize="14" FontWeight="Black" Foreground="#AB8476" HorizontalAlignment="Center"/>
+                                    <Separator Background="#684756"/>
+
+                                    <StackPanel HorizontalAlignment="Center" Spacing="1">
+                                        <TextBlock Text="ELO ONLINE" FontSize="10" FontWeight="Bold" Foreground="#AAAABB" HorizontalAlignment="Center"/>
+                                        <TextBlock Text="{Binding ProfileVm.Profile.EloOnline}" FontSize="32" FontWeight="Black" Foreground="#FFD500" HorizontalAlignment="Center"/>
+                                        <TextBlock Text="Standard Match" FontSize="11" Foreground="#AAAABB" HorizontalAlignment="Center"/>
+                                    </StackPanel>
+
+                                    <Grid ColumnDefinitions="*, *" Margin="0,5,0,0">
+                                        <StackPanel Grid.Column="0" Spacing="4">
+                                            <TextBlock Text="Partite:" Foreground="#AAAABB" FontSize="11"/>
+                                            <TextBlock Text="Vittorie:" Foreground="#4CAF50" FontSize="11" FontWeight="Bold"/>
+                                            <TextBlock Text="Patte:" Foreground="#FFD500" FontSize="11" FontWeight="Bold"/>
+                                            <TextBlock Text="Sconfitte:" Foreground="#FF5252" FontSize="11" FontWeight="Bold"/>
+                                            <TextBlock Text="Win Rate:" Foreground="#AB8476" FontSize="11" FontWeight="Bold"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" HorizontalAlignment="Right" Spacing="4">
+                                            <TextBlock Text="{Binding ProfileVm.Profile.OnlineMatchesPlayed}" Foreground="White" FontSize="11"/>
+                                            <TextBlock Text="{Binding ProfileVm.Profile.OnlineWins}" Foreground="#4CAF50" FontSize="11" FontWeight="Bold"/>
+                                            <TextBlock Text="{Binding ProfileVm.Profile.OnlineDraws}" Foreground="#FFD500" FontSize="11" FontWeight="Bold"/>
+                                            <TextBlock Text="{Binding ProfileVm.Profile.OnlineLosses}" Foreground="#FF5252" FontSize="11" FontWeight="Bold"/>
+                                            <TextBlock Text="{Binding ProfileVm.Profile.OnlineWinRate, StringFormat='{}{0}%'}" Foreground="#AB8476" FontSize="11" FontWeight="Bold"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                        </Grid>
+                    </Grid>
+                </Border>
+            </Grid>
+
+        </Grid>
+    </Grid>
 </Window>

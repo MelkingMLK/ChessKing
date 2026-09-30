@@ -15,10 +15,12 @@ namespace ChessStrategyApp.ViewModels;
 public partial class GameViewModel : ObservableObject
 {
     public enum GameMode { None, Local, P2P, Solo }
+    public enum SoloType { None, Campaign, BotLadder }
 
     private readonly GameEngineService _engine = new();
     private readonly MatchHistoryService _historyService = new();
     private readonly SignalRClientService _network = new();
+    private readonly BotEngineService _botService = new();
     private readonly Random _random = new();
 
     private ChessSquare? _selectedSquare;
@@ -34,10 +36,10 @@ public partial class GameViewModel : ObservableObject
     public ObservableCollection<string> WhiteMovesHistory { get; } = new();
     public ObservableCollection<string> BlackMovesHistory { get; } = new();
 
-    // --- TRACCIAMENTO ULTIMA MOSSA (COORDINATE LOGICHE PER CORNER MARKERS) ---
+    // --- TRACCIAMENTO ULTIMA MOSSA (CORNER MARKERS) ---
     private (int FromFile, int FromRank, int ToFile, int ToRank)? _lastMoveCoordinates;
 
-    // --- STATO DELLA MODALITÀ E NAVIGAZIONE ---
+    // --- STATI DELLA MODALITÀ E NAVIGAZIONE ---
     private GameMode _currentGameMode = GameMode.None;
     public GameMode CurrentGameMode
     {
@@ -51,6 +53,14 @@ public partial class GameViewModel : ObservableObject
             }
         }
     }
+
+    [ObservableProperty]
+    private SoloType _activeSoloType = SoloType.None;
+
+    [ObservableProperty]
+    private int _currentBotElo = 200;
+
+    public event Action<SoloType, double, int>? OnBotMatchConcluded;
 
     public bool IsModeSelectionVisible => CurrentGameMode == GameMode.None;
     public bool IsBoardViewVisible => CurrentGameMode == GameMode.Local || CurrentGameMode == GameMode.Solo || (CurrentGameMode == GameMode.P2P && IsP2PGameActive);
@@ -113,7 +123,7 @@ public partial class GameViewModel : ObservableObject
 
     private Player _localAssignedPlayer = Player.White;
 
-    // --- LOGICA DI RIBALTAMENTO PROSPETTIVA DELLA SCACCHIERA ---
+    // --- PROIEZIONE GRAFICA / BOARD FLIPPING ---
     private bool IsBoardFlipped => CurrentGameMode == GameMode.P2P && _localAssignedPlayer == Player.Black;
 
     private (int file, int rank) DisplayToChessCoords(int displayRow, int displayCol)
@@ -337,7 +347,6 @@ public partial class GameViewModel : ObservableObject
             for (int c = 0; c < 8; c++)
             {
                 var (chessFile, chessRank) = DisplayToChessCoords(r, c);
-
                 var piece = _engine.GetPieceAt(chessFile, chessRank);
                 int index = r * 8 + c;
 
@@ -357,7 +366,7 @@ public partial class GameViewModel : ObservableObject
         UpdateTimerDisplay();
         ClearHighlights();
 
-        // Evidenziazione Corner Markers proiettata sulla visuale attiva
+        // Evidenziazione Corner Markers
         if (_lastMoveCoordinates.HasValue)
         {
             var m = _lastMoveCoordinates.Value;
@@ -379,7 +388,7 @@ public partial class GameViewModel : ObservableObject
             }
         }
 
-        // Calcolo e filtraggio catturati (Max 4 + Badge numerico)
+        // Calcolo e filtraggio catturati
         var (whiteCaps, blackCaps, advantage) = _engine.GetCapturedPiecesAndScore();
         UpdateCapturedLists(whiteCaps, blackCaps);
 
@@ -414,13 +423,32 @@ public partial class GameViewModel : ObservableObject
         ActivePlayerName = IsWhiteActive ? WhitePlayerName : BlackPlayerName;
         ActivePlayerColorTag = IsWhiteActive ? "⚪ Bianco" : "⚫ Nero";
 
+        // Gestione esiti regolamentari
         if (_engine.IsGameOver)
         {
             if (!_matchSaved)
             {
-                string winner = _engine.Turn == Player.White ? BlackPlayerName : WhitePlayerName;
-                StatusMessage = $"Scacco Matto! Vince {winner}.";
-                _ = SaveCurrentMatchAsync(winner, "Scacco Matto");
+                if (_engine.IsStalemate())
+                {
+                    StatusMessage = "Partita Patta per Stallo! Nessuna mossa legale disponibile.";
+                    _ = SaveCurrentMatchAsync("Patta", "Stallo");
+                }
+                else if (_engine.IsDrawByRepetition())
+                {
+                    StatusMessage = "Partita Patta per Triplice Ripetizione di posizione.";
+                    _ = SaveCurrentMatchAsync("Patta", "Triplice Ripetizione");
+                }
+                else if (_engine.IsCheckmate())
+                {
+                    string winner = _engine.Turn == Player.White ? BlackPlayerName : WhitePlayerName;
+                    StatusMessage = $"Scacco Matto! Vince {winner}.";
+                    _ = SaveCurrentMatchAsync(winner, "Scacco Matto");
+                }
+                else
+                {
+                    StatusMessage = "Partita conclusa in Parità.";
+                    _ = SaveCurrentMatchAsync("Patta", "Regolamentare");
+                }
             }
         }
         else if (_engine.IsPlayerInCheck(_engine.Turn))
@@ -503,11 +531,52 @@ public partial class GameViewModel : ObservableObject
         }
     }
 
+    // --- GESTIONE BOT MODES ---
+    public void StartCampaignMatch(int playerElo, int winStreak)
+    {
+        CurrentGameMode = GameMode.Solo;
+        ActiveSoloType = SoloType.Campaign;
+        CurrentBotElo = Math.Max(200, playerElo + (winStreak * 25));
+
+        WhitePlayerName = string.IsNullOrWhiteSpace(Nickname) ? "Tu" : Nickname.Trim();
+        BlackPlayerName = $"Oscar (Bot {CurrentBotElo})";
+
+        StartSoloGame();
+    }
+
+    public void StartBotLadderMatch(int selectedElo)
+    {
+        CurrentGameMode = GameMode.Solo;
+        ActiveSoloType = SoloType.BotLadder;
+        CurrentBotElo = selectedElo;
+
+        WhitePlayerName = string.IsNullOrWhiteSpace(Nickname) ? "Tu" : Nickname.Trim();
+        BlackPlayerName = $"Bot Tier {CurrentBotElo}";
+
+        StartSoloGame();
+    }
+
+    private void StartSoloGame()
+    {
+        IsP2PConfigVisible = false;
+        IsP2PGameActive = false;
+        IsSetupModalActive = false;
+        _matchStartTime = DateTime.Now;
+        _moves.Clear();
+        WhiteMovesHistory.Clear();
+        BlackMovesHistory.Clear();
+        _lastMoveCoordinates = null;
+        _matchSaved = false;
+        _engine.ResetGame();
+        RefreshBoardFromEngine();
+    }
+
     // --- SELEZIONE MODALITÀ ---
     [RelayCommand]
     private void SelectLocalMode()
     {
         CurrentGameMode = GameMode.Local;
+        ActiveSoloType = SoloType.None;
         IsP2PConfigVisible = false;
         IsP2PGameActive = false;
         IsSetupModalActive = true;
@@ -517,6 +586,7 @@ public partial class GameViewModel : ObservableObject
     private void SelectP2PMode()
     {
         CurrentGameMode = GameMode.P2P;
+        ActiveSoloType = SoloType.None;
         IsP2PConfigVisible = true;
         IsP2PGameActive = false;
         IsSetupModalActive = false;
@@ -524,28 +594,11 @@ public partial class GameViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void SelectSoloMode()
-    {
-        CurrentGameMode = GameMode.Solo;
-        IsP2PConfigVisible = false;
-        IsP2PGameActive = false;
-        IsSetupModalActive = false;
-        WhitePlayerName = "Giocatore";
-        BlackPlayerName = "Chess Bot (CPU)";
-        _matchStartTime = DateTime.Now;
-        _moves.Clear();
-        WhiteMovesHistory.Clear();
-        BlackMovesHistory.Clear();
-        _lastMoveCoordinates = null;
-        _matchSaved = false;
-        RefreshBoardFromEngine();
-    }
-
-    [RelayCommand]
     private async Task BackToModeSelection()
     {
         await _network.DisconnectAsync();
         CurrentGameMode = GameMode.None;
+        ActiveSoloType = SoloType.None;
         IsP2PConfigVisible = false;
         IsP2PGameActive = false;
         IsVictoryModalActive = false;
@@ -595,7 +648,6 @@ public partial class GameViewModel : ObservableObject
     {
         if (IsModeSelectionVisible || IsSetupModalActive || _engine.IsGameOver || IsPromotionModalActive || IsVictoryModalActive) return;
 
-        // Blocco turni in modalità Online se non è il turno del colore assegnato
         if (CurrentGameMode == GameMode.P2P && _engine.Turn != _localAssignedPlayer) return;
 
         if (_selectedSquare == null)
@@ -726,37 +778,30 @@ public partial class GameViewModel : ObservableObject
 
     private void TriggerCpuReply()
     {
-        Task.Delay(400).ContinueWith(_ =>
+        Task.Delay(350).ContinueWith(async _ =>
         {
-            Dispatcher.UIThread.Post(() =>
+            if (_engine.Turn == Player.Black && !_engine.IsGameOver)
             {
-                if (_engine.Turn == Player.Black && !_engine.IsGameOver)
+                var bestMove = await _botService.PickBestMoveAsync(_engine.RawGameInstance, CurrentBotElo);
+                if (bestMove != null)
                 {
-                    for (int f = 0; f < 8; f++)
+                    Dispatcher.UIThread.Post(() =>
                     {
-                        for (int r = 1; r <= 8; r++)
+                        string from = $"{(char)('a' + (int)bestMove.OriginalPosition.File)}{bestMove.OriginalPosition.Rank}";
+                        string to = $"{(char)('a' + (int)bestMove.NewPosition.File)}{bestMove.NewPosition.Rank}";
+                        char promo = bestMove.Promotion.HasValue ? bestMove.Promotion.Value : ' ';
+
+                        bool success = promo != ' ' ? _engine.TryMove(from, to, promo) : _engine.TryMove(from, to);
+                        if (success)
                         {
-                            var p = _engine.GetPieceAt(f, r);
-                            if (p != null && p.Owner == Player.Black)
-                            {
-                                string from = $"{(char)('a' + f)}{r}";
-                                var targets = _engine.GetLegalDestinations(from);
-                                if (targets.Count > 0)
-                                {
-                                    string to = $"{(char)('a' + (int)targets[0].File)}{targets[0].Rank}";
-                                    if (_engine.TryMove(from, to))
-                                    {
-                                        _moves.Add($"{from}-{to}");
-                                        RecordMoveInHistory(from, to, isWhiteTurn: false);
-                                        RefreshBoardFromEngine();
-                                        return;
-                                    }
-                                }
-                            }
+                            string moveRecord = promo != ' ' ? $"{from}-{to}={promo}" : $"{from}-{to}";
+                            _moves.Add(moveRecord);
+                            RecordMoveInHistory(from, to, isWhiteTurn: false);
+                            RefreshBoardFromEngine();
                         }
-                    }
+                    });
                 }
-            });
+            }
         });
     }
 
@@ -821,7 +866,7 @@ public partial class GameViewModel : ObservableObject
         RefreshBoardFromEngine();
     }
 
-    private async Task SaveCurrentMatchAsync(string winner, string reason)
+   private async Task SaveCurrentMatchAsync(string winner, string reason)
     {
         _matchSaved = true;
 
@@ -830,10 +875,40 @@ public partial class GameViewModel : ObservableObject
             ? "Parità materiale" 
             : (advantage > 0 ? $"+{advantage} per il Bianco" : $"+{Math.Abs(advantage)} per il Nero");
 
-        VictoryTitle = $"HA VINTO {winner.ToUpperInvariant()}!";
-        VictoryMessage = $"Esito: {reason}";
+        if (winner == "Patta")
+        {
+            VictoryTitle = "PARTITA PATTA";
+            VictoryMessage = $"Esito: {reason}";
+        }
+        else
+        {
+            VictoryTitle = $"HA VINTO {winner.ToUpperInvariant()}!";
+            VictoryMessage = $"Esito: {reason}";
+        }
+
         VictoryDeltaScore = $"Differenza Materiale: {deltaString}";
         IsVictoryModalActive = true;
+
+        // NOTIFICA AL PROFILO CON ESITO CERTO (SENZA COMPARAZIONE NICKNAME FRAGILE)
+        if (CurrentGameMode == GameMode.Solo && ActiveSoloType != SoloType.None)
+        {
+            double outcome;
+            if (winner == "Patta")
+            {
+                outcome = 0.5;
+            }
+            else if (winner.Equals(WhitePlayerName, StringComparison.OrdinalIgnoreCase))
+            {
+                outcome = 1.0; // Ha vinto il Bianco (Giocatore umano)
+            }
+            else
+            {
+                outcome = 0.0; // Ha vinto il Nero (Bot)
+            }
+
+            // Invochiamo l'evento passando il tier giocato
+            OnBotMatchConcluded?.Invoke(ActiveSoloType, outcome, CurrentBotElo);
+        }
 
         var item = new MatchHistoryItem
         {

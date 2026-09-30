@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ChessStrategyApp.Models;
@@ -13,6 +14,7 @@ namespace ChessStrategyApp.ViewModels;
 public partial class MainWindowViewModel : ObservableObject
 {
     private readonly StrategyService _strategyService = new();
+    private readonly ProfileService _profileService = new();
     private ChessStrategyStore _database = new();
 
     [ObservableProperty]
@@ -24,11 +26,23 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     private HistoryViewModel _history = new();
 
+    [ObservableProperty]
+    private StrategyViewerViewModel _strategyViewer = new();
+
+    public ProfileViewModel ProfileVm { get; }
+
     public bool IsPlayViewVisible => CurrentView == "Play";
     public bool IsStrategyViewVisible => CurrentView == "Strategy";
     public bool IsHistoryViewVisible => CurrentView == "History";
+    public bool IsProfileViewVisible => CurrentView == "Profile";
 
-    // --- SEZIONE STRATEGY (CATALOGO APERTURE) ---
+    // --- SELEZIONE BOT LADDER DINAMICA ---
+    [ObservableProperty]
+    private int _selectedLadderElo = 200;
+
+    public ObservableCollection<int> AvailableLadderTiers { get; } = new() { 200 };
+
+    // --- SEZIONE STRATEGY (CATALOGO APERTURE CON ALBERO MOVENODE) ---
     public ObservableCollection<string> StrategyTypes { get; } = new() { "Opening" };
     public ObservableCollection<string> PlayerColors { get; } = new() { "Tutti", "White", "Black" };
     public ObservableCollection<OpeningStrategy> FilteredOpenings { get; } = new();
@@ -124,8 +138,87 @@ public partial class MainWindowViewModel : ObservableObject
 
     public MainWindowViewModel()
     {
+        ProfileVm = new ProfileViewModel(_profileService);
+
+        // Cablaggio evento completamento match contro Bot per aggiornamento Profilo e sblocco Ladder
+      GameBoard.OnBotMatchConcluded += async (soloType, outcome, botElo) =>
+        {
+            if (soloType == GameViewModel.SoloType.Campaign)
+            {
+                await ProfileVm.RegisterCampaignResultAsync(outcome, botElo);
+            }
+            else if (soloType == GameViewModel.SoloType.BotLadder)
+            {
+                // 1. Aspetta che il file sia scritto e confermato sul disco
+                await ProfileVm.RegisterBotLadderResultAsync(outcome, botElo);
+                
+                // 2. Poi ricalcola i tier disponibili sulla UI
+                Dispatcher.UIThread.Post(() =>
+                {
+                    RefreshAvailableTiers();
+                    if (outcome == 1.0 && AvailableLadderTiers.Count > 0)
+                    {
+                        SelectedLadderElo = AvailableLadderTiers.Last();
+                    }
+                });
+            }
+        };
+
         _database = Task.Run(async () => await _strategyService.LoadStrategiesAsync()).Result;
         ApplyFilters();
+
+        _ = InitializeProfileAndLadderAsync();
+    }
+
+    private async Task InitializeProfileAndLadderAsync()
+    {
+        await ProfileVm.InitializeAsync();
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (!string.IsNullOrWhiteSpace(ProfileVm.Profile.Nickname))
+            {
+                GameBoard.Nickname = ProfileVm.Profile.Nickname;
+            }
+            RefreshAvailableTiers();
+        });
+    }
+public void RefreshAvailableTiers()
+    {
+        int maxDefeated = ProfileVm.Profile.HighestBotDefeatedElo;
+        
+        // Se non ha battuto nessuno (0), sblocca 200.
+        // Se ha battuto 200, sblocca fino a 400.
+        int maxUnlockable = Math.Max(200, Math.Min(2000, maxDefeated + 200));
+
+        var newTiers = new List<int>();
+        for (int tier = 200; tier <= maxUnlockable; tier += 200)
+        {
+            newTiers.Add(tier);
+        }
+
+        AvailableLadderTiers.Clear();
+        foreach (var tier in newTiers)
+        {
+            AvailableLadderTiers.Add(tier);
+        }
+
+        if (!AvailableLadderTiers.Contains(SelectedLadderElo))
+        {
+            SelectedLadderElo = AvailableLadderTiers.LastOrDefault();
+        }
+
+        OnPropertyChanged(nameof(SelectedLadderElo));
+    }
+    [RelayCommand]
+    private void LaunchCampaign()
+    {
+        GameBoard.StartCampaignMatch(ProfileVm.Profile.EloSoloCampaign, ProfileVm.Profile.CurrentWinStreak);
+    }
+
+    [RelayCommand]
+    private void LaunchBotLadder()
+    {
+        GameBoard.StartBotLadderMatch(SelectedLadderElo);
     }
 
     [RelayCommand]
@@ -137,10 +230,24 @@ public partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(IsPlayViewVisible));
         OnPropertyChanged(nameof(IsStrategyViewVisible));
         OnPropertyChanged(nameof(IsHistoryViewVisible));
+        OnPropertyChanged(nameof(IsProfileViewVisible));
 
         if (viewName == "History")
         {
             await History.LoadHistoryAsync();
+        }
+        else if (viewName == "Profile")
+        {
+            await ProfileVm.InitializeAsync();
+            RefreshAvailableTiers();
+        }
+        else if (viewName == "Play")
+        {
+            if (!string.IsNullOrWhiteSpace(ProfileVm.Profile.Nickname))
+            {
+                GameBoard.Nickname = ProfileVm.Profile.Nickname;
+            }
+            RefreshAvailableTiers();
         }
     }
 
@@ -248,13 +355,12 @@ public partial class MainWindowViewModel : ObservableObject
     {
         ResetForm();
     }
+
     [RelayCommand]
     private async Task DeleteMatch(MatchHistoryItem? match)
     {
         await History.DeleteMatchCommand.ExecuteAsync(match);
     }
-    [ObservableProperty]
-    private StrategyViewerViewModel _strategyViewer = new();
 
     [RelayCommand]
     private void ViewOpening(OpeningStrategy? opening)
@@ -262,7 +368,6 @@ public partial class MainWindowViewModel : ObservableObject
         var target = opening ?? SelectedOpening;
         if (target == null) return;
 
-        // Estrae l'elenco piatto delle mosse dal root
         var moves = new List<string>();
         if (target.RootMoves != null && target.RootMoves.Count > 0)
         {
@@ -276,6 +381,7 @@ public partial class MainWindowViewModel : ObservableObject
 
         StrategyViewer.LoadOpening(target, moves);
     }
+
     private void ResetForm()
     {
         _selectedOpening = null;
@@ -298,5 +404,4 @@ public partial class MainWindowViewModel : ObservableObject
             current = current.NextMoves.Count > 0 ? current.NextMoves[0] : null!;
         }
     }
-    
 }

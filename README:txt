@@ -91,17 +91,5 @@ dotnet run
 
 ---
 
-## 🎨 Design System e Palette
-
-L'interfaccia adotta una palette dark a contrasto bilanciato:
-* Sfondo Principale: `#1A1423`
-* Sidebar / Pannelli Secondari: `#3D314A`
-* Bordi e Divisori Strutturali: `#684756`
-* Accenti Primari / CTA: `#96705B`
-* Testi Evidenziati / Titoli: `#AB8476`
-* Scacchiera: Bianco e Nero ad alto contrasto con indicatori di stato (Scacco, Selezione, Mosse Legali).
-
----
-
 ## 📄 Licenza
 Distribuito sotto licenza MIT. Libero per scopi didattici e di sviluppo.

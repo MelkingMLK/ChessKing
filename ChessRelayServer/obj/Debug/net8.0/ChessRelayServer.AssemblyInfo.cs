@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("ChessRelayServer")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+ccce3497579a58236bd9b47af433b834890ec7ec")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b6215b43d2b7d578e5932d0e358c93f9c0eed725")]
 [assembly: System.Reflection.AssemblyProductAttribute("ChessRelayServer")]
 [assembly: System.Reflection.AssemblyTitleAttribute("ChessRelayServer")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

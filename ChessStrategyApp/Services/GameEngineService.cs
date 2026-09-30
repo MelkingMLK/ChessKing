@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
-using System.Timers;
+using System.Collections.ObjectModel;
+using System.Linq;
+using Avalonia.Threading;
 using ChessDotNet;
 using ChessDotNet.Pieces;
 
@@ -8,44 +10,44 @@ namespace ChessStrategyApp.Services;
 
 public class GameEngineService
 {
-    private ChessGame _game = new();
-    private readonly Timer _gameTimer;
-    
-    public TimeSpan WhiteTime { get; private set; } = TimeSpan.FromMinutes(15);
-    public TimeSpan BlackTime { get; private set; } = TimeSpan.FromMinutes(15);
-    
-    public bool IsTimerRunning => _gameTimer.Enabled;
-    public Player Turn => _game.WhoseTurn;
-    public bool IsGameOver => _game.IsCheckmated(Player.White) || _game.IsCheckmated(Player.Black) || 
-                              _game.IsStalemated(Player.White) || _game.IsStalemated(Player.Black);
+    private ChessGame _game;
+    private readonly DispatcherTimer _timer;
+    private readonly Dictionary<string, int> _positionHistory = new();
 
     public event Action? OnTimeTick;
     public event Action<Player>? OnTimeOut;
     public event Action? OnMoveExecuted;
 
+    public TimeSpan WhiteTime { get; private set; } = TimeSpan.FromMinutes(15);
+    public TimeSpan BlackTime { get; private set; } = TimeSpan.FromMinutes(15);
+
+    public Player Turn => _game.WhoseTurn;
+    public bool IsGameOver => IsCheckmate() || IsStalemate() || IsDrawByRepetition();
+
+    // Esposizione per il motore decisionale del Bot
+    public ChessGame RawGameInstance => _game;
+
     public GameEngineService()
     {
-        _gameTimer = new Timer(1000);
-        _gameTimer.Elapsed += HandleTimerTick;
-    }
-
-    public void ResetGame()
-    {
-        _gameTimer.Stop();
         _game = new ChessGame();
-        WhiteTime = TimeSpan.FromMinutes(15);
-        BlackTime = TimeSpan.FromMinutes(15);
-        OnMoveExecuted?.Invoke();
+        TrackCurrentPosition();
+
+        _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        _timer.Tick += (s, e) => HandleTimerTick();
+        _timer.Start();
     }
 
-    private void HandleTimerTick(object? sender, ElapsedEventArgs e)
+    private void HandleTimerTick()
     {
+        if (IsGameOver) return;
+
         if (Turn == Player.White)
         {
             WhiteTime = WhiteTime.Subtract(TimeSpan.FromSeconds(1));
             if (WhiteTime <= TimeSpan.Zero)
             {
-                _gameTimer.Stop();
+                WhiteTime = TimeSpan.Zero;
+                _timer.Stop();
                 OnTimeOut?.Invoke(Player.White);
             }
         }
@@ -54,7 +56,8 @@ public class GameEngineService
             BlackTime = BlackTime.Subtract(TimeSpan.FromSeconds(1));
             if (BlackTime <= TimeSpan.Zero)
             {
-                _gameTimer.Stop();
+                BlackTime = TimeSpan.Zero;
+                _timer.Stop();
                 OnTimeOut?.Invoke(Player.Black);
             }
         }
@@ -62,86 +65,120 @@ public class GameEngineService
         OnTimeTick?.Invoke();
     }
 
-    public List<Position> GetLegalDestinations(string fromSquare)
+    public void ResetGame()
     {
-        var destinations = new List<Position>();
-        try
+        _game = new ChessGame();
+        _positionHistory.Clear();
+        TrackCurrentPosition();
+
+        WhiteTime = TimeSpan.FromMinutes(15);
+        BlackTime = TimeSpan.FromMinutes(15);
+
+        if (!_timer.IsEnabled)
         {
-            var from = new Position(fromSquare);
-            var piece = _game.GetPieceAt(from);
-            if (piece == null || piece.Owner != _game.WhoseTurn)
-                return destinations;
-
-            var validMoves = _game.GetValidMoves(from);
-            foreach (var move in validMoves)
-            {
-                destinations.Add(move.NewPosition);
-            }
-        }
-        catch { }
-        return destinations;
-    }
-
-    public bool IsPawnPromotion(string fromSquare, string toSquare)
-    {
-        try
-        {
-            var from = new Position(fromSquare);
-            var to = new Position(toSquare);
-            var piece = _game.GetPieceAt(from);
-            if (piece is Pawn)
-            {
-                if (piece.Owner == Player.White && to.Rank == 8) return true;
-                if (piece.Owner == Player.Black && to.Rank == 1) return true;
-            }
-        }
-        catch { }
-        return false;
-    }
-
-    public bool TryMove(string fromSquare, string toSquare, char? promotionPiece = null)
-    {
-        try
-        {
-            var from = new Position(fromSquare);
-            var to = new Position(toSquare);
-            
-            Move move = promotionPiece.HasValue
-                ? new Move(from, to, _game.WhoseTurn, promotionPiece.Value)
-                : new Move(from, to, _game.WhoseTurn);
-
-            bool isValid = _game.IsValidMove(move);
-            if (!isValid) return false;
-
-            _game.MakeMove(move, true);
-
-            if (!_gameTimer.Enabled && !IsGameOver)
-            {
-                _gameTimer.Start();
-            }
-
-            if (IsGameOver)
-            {
-                _gameTimer.Stop();
-            }
-
-            OnMoveExecuted?.Invoke();
-            return true;
-        }
-        catch
-        {
-            return false;
+            _timer.Start();
         }
     }
 
     public Piece? GetPieceAt(int file, int rank)
     {
-        var fileChar = (File)file;
-        var position = new Position(fileChar, rank);
-        return _game.GetPieceAt(position);
+        var pos = new Position((File)file, rank);
+        return _game.GetPieceAt(pos);
     }
 
+    public ReadOnlyCollection<Position> GetLegalDestinations(string fromSquare)
+    {
+        if (fromSquare.Length < 2) return new ReadOnlyCollection<Position>(new List<Position>());
+
+        int file = fromSquare[0] - 'a';
+        int rank = fromSquare[1] - '0';
+        var fromPos = new Position((File)file, rank);
+
+        var destinations = new List<Position>();
+        var moves = _game.GetValidMoves(Turn);
+
+        foreach (var m in moves)
+        {
+            if (m.OriginalPosition.Equals(fromPos))
+            {
+                destinations.Add(m.NewPosition);
+            }
+        }
+
+        return new ReadOnlyCollection<Position>(destinations);
+    }
+
+    public bool IsPawnPromotion(string fromSquare, string toSquare)
+    {
+        if (fromSquare.Length < 2 || toSquare.Length < 2) return false;
+
+        int fromFile = fromSquare[0] - 'a';
+        int fromRank = fromSquare[1] - '0';
+        int toRank = toSquare[1] - '0';
+
+        var piece = _game.GetPieceAt(new Position((File)fromFile, fromRank));
+        if (piece is Pawn)
+        {
+            if (piece.Owner == Player.White && fromRank == 7 && toRank == 8) return true;
+            if (piece.Owner == Player.Black && fromRank == 2 && toRank == 1) return true;
+        }
+
+        return false;
+    }
+
+    public bool TryMove(string fromSquare, string toSquare, char promotion = ' ')
+    {
+        if (fromSquare.Length < 2 || toSquare.Length < 2) return false;
+
+        int fromFile = fromSquare[0] - 'a';
+        int fromRank = fromSquare[1] - '0';
+        int toFile = toSquare[0] - 'a';
+        int toRank = toSquare[1] - '0';
+
+        var fromPos = new Position((File)fromFile, fromRank);
+        var toPos = new Position((File)toFile, toRank);
+
+        Move move = promotion != ' ' ? new Move(fromPos, toPos, Turn, promotion) : new Move(fromPos, toPos, Turn);
+
+        if (_game.IsValidMove(move))
+        {
+            _game.MakeMove(move, true);
+            TrackCurrentPosition();
+            OnMoveExecuted?.Invoke();
+            return true;
+        }
+
+        return false;
+    }
+
+    private void TrackCurrentPosition()
+    {
+        string fen = _game.GetFen();
+        string key = string.Join(" ", fen.Split(' ').Take(4));
+
+        if (_positionHistory.TryGetValue(key, out int count))
+        {
+            _positionHistory[key] = count + 1;
+        }
+        else
+        {
+            _positionHistory[key] = 1;
+        }
+    }
+
+    public bool IsDrawByRepetition()
+    {
+        string fen = _game.GetFen();
+        string key = string.Join(" ", fen.Split(' ').Take(4));
+        return _positionHistory.TryGetValue(key, out int count) && count >= 3;
+    }
+
+    public bool IsStalemate() => _game.IsStalemated(_game.WhoseTurn);
+
+    public bool IsCheckmate() => _game.IsCheckmated(_game.WhoseTurn);
+
     public bool IsPlayerInCheck(Player player) => _game.IsInCheck(player);
+
     public bool IsPlayerCheckmated(Player player) => _game.IsCheckmated(player);
 
     public Position? FindKingPosition(Player player)
@@ -150,81 +187,62 @@ public class GameEngineService
         {
             for (int r = 1; r <= 8; r++)
             {
-                var piece = GetPieceAt(f, r);
-                if (piece is ChessDotNet.Pieces.King && piece.Owner == player)
-                {
-                    return new Position((File)f, r);
-                }
+                var pos = new Position((File)f, r);
+                var p = _game.GetPieceAt(pos);
+                if (p is King && p.Owner == player) return pos;
             }
         }
         return null;
     }
 
-    public (List<string> WhiteCapturedPieces, List<string> BlackCapturedPieces, int MaterialAdvantage) GetCapturedPiecesAndScore()
+    public (List<string> WhiteCaptured, List<string> BlackCaptured, int ScoreAdvantage) GetCapturedPiecesAndScore()
     {
-        var startingWhite = new Dictionary<char, int> { ['P'] = 8, ['N'] = 2, ['B'] = 2, ['R'] = 2, ['Q'] = 1 };
-        var startingBlack = new Dictionary<char, int> { ['P'] = 8, ['N'] = 2, ['B'] = 2, ['R'] = 2, ['Q'] = 1 };
+        int wP = 8, wN = 2, wB = 2, wR = 2, wQ = 1;
+        int bP = 8, bN = 2, bB = 2, bR = 2, bQ = 1;
 
-        var aliveWhite = new Dictionary<char, int> { ['P'] = 0, ['N'] = 0, ['B'] = 0, ['R'] = 0, ['Q'] = 0 };
-        var aliveBlack = new Dictionary<char, int> { ['P'] = 0, ['N'] = 0, ['B'] = 0, ['R'] = 0, ['Q'] = 0 };
-
-        for (int file = 0; file < 8; file++)
+        for (int f = 0; f < 8; f++)
         {
-            for (int rank = 1; rank <= 8; rank++)
+            for (int r = 1; r <= 8; r++)
             {
-                var piece = GetPieceAt(file, rank);
-                if (piece != null)
-                {
-                    char fen = char.ToUpperInvariant(piece.GetFenCharacter());
-                    if (fen == 'K') continue;
+                var p = _game.GetPieceAt(new Position((File)f, r));
+                if (p == null) continue;
 
-                    if (piece.Owner == Player.White)
-                    {
-                        if (aliveWhite.ContainsKey(fen)) aliveWhite[fen]++;
-                    }
-                    else
-                    {
-                        if (aliveBlack.ContainsKey(fen)) aliveBlack[fen]++;
-                    }
+                if (p.Owner == Player.White)
+                {
+                    if (p is Pawn) wP--;
+                    else if (p is Knight) wN--;
+                    else if (p is Bishop) wB--;
+                    else if (p is Rook) wR--;
+                    else if (p is Queen) wQ--;
+                }
+                else
+                {
+                    if (p is Pawn) bP--;
+                    else if (p is Knight) bN--;
+                    else if (p is Bishop) bB--;
+                    else if (p is Rook) bR--;
+                    else if (p is Queen) bQ--;
                 }
             }
         }
-
-        var values = new Dictionary<char, int> { ['P'] = 1, ['N'] = 3, ['B'] = 3, ['R'] = 5, ['Q'] = 9 };
-        var glyphsWhite = new Dictionary<char, string> { ['P'] = "♙", ['N'] = "♘", ['B'] = "♗", ['R'] = "♖", ['Q'] = "♕" };
-        var glyphsBlack = new Dictionary<char, string> { ['P'] = "♟", ['N'] = "♞", ['B'] = "♝", ['R'] = "♜", ['Q'] = "♛" };
 
         var whiteCaptured = new List<string>();
-        int whiteCapturedValue = 0;
-        foreach (var kvp in startingBlack)
-        {
-            int diff = kvp.Value - aliveBlack[kvp.Key];
-            if (diff > 0)
-            {
-                for (int i = 0; i < diff; i++)
-                {
-                    whiteCaptured.Add(glyphsBlack[kvp.Key]);
-                    whiteCapturedValue += values[kvp.Key];
-                }
-            }
-        }
+        for (int i = 0; i < Math.Max(0, bQ); i++) whiteCaptured.Add("♛");
+        for (int i = 0; i < Math.Max(0, bR); i++) whiteCaptured.Add("♜");
+        for (int i = 0; i < Math.Max(0, bB); i++) whiteCaptured.Add("♝");
+        for (int i = 0; i < Math.Max(0, bN); i++) whiteCaptured.Add("♞");
+        for (int i = 0; i < Math.Max(0, bP); i++) whiteCaptured.Add("♟");
 
         var blackCaptured = new List<string>();
-        int blackCapturedValue = 0;
-        foreach (var kvp in startingWhite)
-        {
-            int diff = kvp.Value - aliveWhite[kvp.Key];
-            if (diff > 0)
-            {
-                for (int i = 0; i < diff; i++)
-                {
-                    blackCaptured.Add(glyphsWhite[kvp.Key]);
-                    blackCapturedValue += values[kvp.Key];
-                }
-            }
-        }
+        for (int i = 0; i < Math.Max(0, wQ); i++) blackCaptured.Add("♕");
+        for (int i = 0; i < Math.Max(0, wR); i++) blackCaptured.Add("♖");
+        for (int i = 0; i < Math.Max(0, wB); i++) blackCaptured.Add("♗");
+        for (int i = 0; i < Math.Max(0, wN); i++) blackCaptured.Add("♘");
+        for (int i = 0; i < Math.Max(0, wP); i++) blackCaptured.Add("♙");
 
-        int advantage = whiteCapturedValue - blackCapturedValue;
-        return (whiteCaptured, blackCaptured, advantage);
+        int whiteMaterial = (8 - Math.Max(0, wP)) * 1 + (2 - Math.Max(0, wN)) * 3 + (2 - Math.Max(0, wB)) * 3 + (2 - Math.Max(0, wR)) * 5 + (1 - Math.Max(0, wQ)) * 9;
+        int blackMaterial = (8 - Math.Max(0, bP)) * 1 + (2 - Math.Max(0, bN)) * 3 + (2 - Math.Max(0, bB)) * 3 + (2 - Math.Max(0, bR)) * 5 + (1 - Math.Max(0, bQ)) * 9;
+
+        return (whiteCaptured, blackCaptured, whiteMaterial - blackMaterial);
     }
 }
