@@ -7,7 +7,7 @@
         x:Name="RootWindow"
         Title="ChessKing"
         Background="#1A1423"
-        Width="1320" Height="860">
+        Width="1340" Height="860">
 
     <Window.Styles>
         <!-- ANIMAZIONE SCACCO: TREMOLIO -->
@@ -107,19 +107,19 @@
                 
                 <!-- HUB SCELTA MODALITÀ -->
                 <Grid IsVisible="{Binding GameBoard.IsModeSelectionVisible}">
-                    <Border Background="#3D314A" CornerRadius="8" Padding="35" BorderBrush="#684756" BorderThickness="2" MaxWidth="960" MaxHeight="600" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Border Background="#3D314A" CornerRadius="8" Padding="30" BorderBrush="#684756" BorderThickness="2" MaxWidth="1050" MaxHeight="620" HorizontalAlignment="Center" VerticalAlignment="Center">
                         <Grid RowDefinitions="Auto, Auto, *">
-                            <TextBlock Grid.Row="0" Text="SELEZIONA MODALITÀ DI GIOCO" FontSize="26" FontWeight="Black" Foreground="#AB8476" HorizontalAlignment="Center" Margin="0,0,0,8"/>
-                            <TextBlock Grid.Row="1" Text="Scegli la tipologia di scontro o allenamento per questa sessione" FontSize="14" Foreground="#AAAABB" HorizontalAlignment="Center" Margin="0,0,0,30"/>
+                            <TextBlock Grid.Row="0" Text="SELEZIONA MODALITA DI GIOCO" FontSize="24" FontWeight="Black" Foreground="#AB8476" HorizontalAlignment="Center" Margin="0,0,0,6"/>
+                            <TextBlock Grid.Row="1" Text="Scegli la tipologia di partita o allenamento per questa sessione" FontSize="13" Foreground="#AAAABB" HorizontalAlignment="Center" Margin="0,0,0,25"/>
 
-                            <Grid Grid.Row="2" ColumnDefinitions="*, 15, *, 15, *">
+                            <Grid Grid.Row="2" ColumnDefinitions="*, 12, *, 12, *, 12, *">
                                 
-                                <!-- CARD LOCALE -->
-                                <Border Grid.Column="0" Background="#1A1423" CornerRadius="6" BorderBrush="#684756" BorderThickness="1" Padding="16">
+                                <!-- CARD 1: LOCALE -->
+                                <Border Grid.Column="0" Background="#1A1423" CornerRadius="6" BorderBrush="#684756" BorderThickness="1" Padding="14">
                                     <Grid RowDefinitions="Auto, *, Auto">
-                                        <TextBlock Grid.Row="0" Text="👥 LOCALE" FontSize="18" FontWeight="Black" Foreground="White" HorizontalAlignment="Center" Margin="0,5,0,8"/>
-                                        <TextBlock Grid.Row="1" Text="Pass and Play sullo stesso monitor. Sorteggio integrato dei colori, orologi sincronizzati e storico." 
-                                                   Foreground="#AB8476" FontSize="11" TextWrapping="Wrap" TextAlignment="Center" Margin="0,5"/>
+                                        <TextBlock Grid.Row="0" Text="LOCALE" FontSize="16" FontWeight="Black" Foreground="White" HorizontalAlignment="Center" Margin="0,4,0,8"/>
+                                        <TextBlock Grid.Row="1" Text="Pass and Play sullo stesso monitor con sorteggio colori e timer sincronizzati." 
+                                                   Foreground="#AB8476" FontSize="11" TextWrapping="Wrap" TextAlignment="Center" Margin="0,4"/>
                                         <Button Grid.Row="2" Content="GIOCA LOCALE" 
                                                 Command="{Binding GameBoard.SelectLocalModeCommand}"
                                                 Background="#96705B" Foreground="White" FontWeight="Bold"
@@ -127,57 +127,58 @@
                                     </Grid>
                                 </Border>
 
-                                <!-- CARD ONLINE ROOMS -->
-                                <Border Grid.Column="2" Background="#1A1423" CornerRadius="6" BorderBrush="#684756" BorderThickness="1" Padding="16">
+                                <!-- CARD 2: ONLINE ROOMS -->
+                                <Border Grid.Column="2" Background="#1A1423" CornerRadius="6" BorderBrush="#684756" BorderThickness="1" Padding="14">
                                     <Grid RowDefinitions="Auto, *, Auto">
-                                        <TextBlock Grid.Row="0" Text="🌐 ONLINE ROOMS" FontSize="18" FontWeight="Black" Foreground="White" HorizontalAlignment="Center" Margin="0,5,0,8"/>
-                                        <TextBlock Grid.Row="1" Text="Stanze private via WebSockets con SignalR. Sorteggio colori 50/50 e bypass NAT." 
-                                                   Foreground="#AB8476" FontSize="11" TextWrapping="Wrap" TextAlignment="Center" Margin="0,5"/>
-                                        <Button Grid.Row="2" Content="ONLINE" 
+                                        <TextBlock Grid.Row="0" Text="ONLINE ROOMS" FontSize="16" FontWeight="Black" Foreground="White" HorizontalAlignment="Center" Margin="0,4,0,8"/>
+                                        <TextBlock Grid.Row="1" Text="Partite private tramite SignalR con bypass NAT e sorteggio colori automatico." 
+                                                   Foreground="#AB8476" FontSize="11" TextWrapping="Wrap" TextAlignment="Center" Margin="0,4"/>
+                                        <Button Grid.Row="2" Content="GIOCA ONLINE" 
                                                 Command="{Binding GameBoard.SelectP2PModeCommand}"
                                                 Background="#684756" Foreground="White" FontWeight="Bold"
                                                 HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="10" CornerRadius="4"/>
                                     </Grid>
                                 </Border>
 
-                                <!-- CARD CAMPAGNA & BOT LADDER -->
-                                <Border Grid.Column="4" Background="#1A1423" CornerRadius="6" BorderBrush="#684756" BorderThickness="1" Padding="16">
+                                <!-- CARD 3: MODALITA CAMPAGNA -->
+                                <Border Grid.Column="4" Background="#1A1423" CornerRadius="6" BorderBrush="#684756" BorderThickness="1" Padding="14">
                                     <Grid RowDefinitions="Auto, *, Auto, Auto">
-                                        <TextBlock Grid.Row="0" Text="🤖 SFIDA I BOT" FontSize="18" FontWeight="Black" Foreground="White" HorizontalAlignment="Center" Margin="0,5,0,6"/>
-                                        
-                                        <!-- Scelta Campagna Progressiva -->
-                                        <StackPanel Grid.Row="1" Spacing="6" Margin="0,4,0,10">
-                                            <Button Content="{Binding ProfileVm.Profile.EloSoloCampaign, StringFormat='🧗 Campagna (ELO {0})'}" 
-                                                    Command="{Binding LaunchCampaignCommand}"
-                                                    Background="#96705B" Foreground="White" FontWeight="Bold"
-                                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="10" CornerRadius="4"/>
-                                            <TextBlock Text="{Binding ProfileVm.Profile.CurrentWinStreak, StringFormat='Streak: {0} 🔥'}" FontSize="11" Foreground="#FF9800" HorizontalAlignment="Center"/>
-                                        </StackPanel>
+                                        <TextBlock Grid.Row="0" Text="CAMPAGNA" FontSize="16" FontWeight="Black" Foreground="White" HorizontalAlignment="Center" Margin="0,4,0,8"/>
+                                        <TextBlock Grid.Row="1" Text="Scalata progressiva. L'avversario si calibra sul tuo ELO: vincendo sali di rating, perdendo scendi." 
+                                                   Foreground="#AB8476" FontSize="11" TextWrapping="Wrap" TextAlignment="Center" Margin="0,4"/>
+                                        <TextBlock Grid.Row="2" Text="{Binding ProfileVm.Profile.EloSoloCampaign, StringFormat='Tuo Rating: ELO {0}'}" 
+                                                   FontSize="12" FontWeight="Bold" Foreground="#FFD500" HorizontalAlignment="Center" Margin="0,0,0,10"/>
+                                        <Button Grid.Row="3" Content="GIOCA CAMPAGNA" 
+                                                Command="{Binding LaunchCampaignCommand}"
+                                                Background="#96705B" Foreground="White" FontWeight="Bold"
+                                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="10" CornerRadius="4"/>
+                                    </Grid>
+                                </Border>
 
-                                        <Separator Grid.Row="2" Background="#684756" Margin="0,0,0,10"/>
-
-                                        <!-- Scelta Bot Ladder Tier Fisso con Sblocco Dinamico -->
-                                        <!-- Scelta Bot Ladder Tier Fisso con Sblocco Dinamico -->
-                                        <StackPanel Grid.Row="3" Spacing="8">
-                                            <Grid ColumnDefinitions="Auto, *">
-                                                <TextBlock Grid.Column="0" Text="Tier Bot:" Foreground="#AB8476" FontWeight="Bold" FontSize="11" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                                <ComboBox Grid.Column="1" 
-                                                          ItemsSource="{Binding AvailableLadderTiers}" 
-                                                          SelectedItem="{Binding SelectedLadderElo, Mode=TwoWay}" 
-                                                          HorizontalAlignment="Stretch" 
-                                                          Background="#3D314A" Foreground="White" BorderBrush="#684756">
-                                                    <ComboBox.ItemTemplate>
-                                                        <DataTemplate>
-                                                            <TextBlock Text="{Binding StringFormat='ELO {0}'}" Foreground="White" FontWeight="SemiBold"/>
-                                                        </DataTemplate>
-                                                    </ComboBox.ItemTemplate>
-                                                </ComboBox>
-                                            </Grid>
-                                            <Button Content="Sfida Tier" 
-                                                    Command="{Binding LaunchBotLadderCommand}"
-                                                    Background="#684756" Foreground="White" FontWeight="Bold"
-                                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="8" CornerRadius="4"/>
-                                        </StackPanel>
+                                <!-- CARD 4: SFIDA BOT (LADDER A TIER) -->
+                                <Border Grid.Column="6" Background="#1A1423" CornerRadius="6" BorderBrush="#684756" BorderThickness="1" Padding="14">
+                                    <Grid RowDefinitions="Auto, *, Auto, Auto">
+                                        <TextBlock Grid.Row="0" Text="SFIDA BOT" FontSize="16" FontWeight="Black" Foreground="White" HorizontalAlignment="Center" Margin="0,4,0,8"/>
+                                        <TextBlock Grid.Row="1" Text="Livelli fissi da 200 a 2000. Sconfiggi ciascun bot per sbloccare il tier successivo." 
+                                                   Foreground="#AB8476" FontSize="11" TextWrapping="Wrap" TextAlignment="Center" Margin="0,4"/>
+                                        <Grid Grid.Row="2" ColumnDefinitions="Auto, *" Margin="0,0,0,10">
+                                            <TextBlock Grid.Column="0" Text="Livello:" Foreground="#AB8476" FontWeight="Bold" FontSize="11" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                            <ComboBox Grid.Column="1" 
+                                                      ItemsSource="{Binding AvailableLadderTiers}" 
+                                                      SelectedItem="{Binding SelectedLadderElo, Mode=TwoWay}" 
+                                                      HorizontalAlignment="Stretch" 
+                                                      Background="#3D314A" Foreground="White" BorderBrush="#684756">
+                                                <ComboBox.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <TextBlock Text="{Binding StringFormat='ELO {0}'}" Foreground="White" FontWeight="SemiBold"/>
+                                                    </DataTemplate>
+                                                </ComboBox.ItemTemplate>
+                                            </ComboBox>
+                                        </Grid>
+                                        <Button Grid.Row="3" Content="SFIDA TIER" 
+                                                Command="{Binding LaunchBotLadderCommand}"
+                                                Background="#684756" Foreground="White" FontWeight="Bold"
+                                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="10" CornerRadius="4"/>
                                     </Grid>
                                 </Border>
 
@@ -191,7 +192,7 @@
                     <Border Background="#3D314A" CornerRadius="8" Padding="30" BorderBrush="#684756" BorderThickness="2" Width="480" HorizontalAlignment="Center" VerticalAlignment="Center">
                         <StackPanel Spacing="14">
                             <TextBlock Text="CONNESSIONE ONLINE ROOMS" FontSize="18" FontWeight="Black" Foreground="#AB8476" HorizontalAlignment="Center"/>
-                            <TextBlock Text="Crea una stanza o entra con il codice. I colori verranno sorteggiati a caso (50/50)." Foreground="#AAAABB" FontSize="11" TextAlignment="Center" TextWrapping="Wrap"/>
+                            <TextBlock Text="Crea una stanza o entra con il codice. I colori verranno sorteggiati in modo casuale." Foreground="#AAAABB" FontSize="11" TextAlignment="Center" TextWrapping="Wrap"/>
                             <Separator Background="#684756"/>
 
                             <TextBlock Text="Tuo Nickname:" Foreground="White" FontSize="11"/>
@@ -204,12 +205,12 @@
                             <TextBox Text="{Binding GameBoard.RoomCode}" Watermark="Es: TORNEO1" Background="#1A1423" Foreground="White" BorderBrush="#684756"/>
 
                             <Grid ColumnDefinitions="*, 12, *" Margin="0,8,0,0">
-                                <Button Grid.Column="0" Content="🏠 Crea Stanza" 
+                                <Button Grid.Column="0" Content="Crea Stanza" 
                                         Command="{Binding GameBoard.CreateRoomCommand}" 
                                         Background="#96705B" Foreground="White" FontWeight="Bold" 
                                         HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="12" CornerRadius="4"/>
 
-                                <Button Grid.Column="2" Content="🚪 Entra nella Stanza" 
+                                <Button Grid.Column="2" Content="Entra nella Stanza" 
                                         Command="{Binding GameBoard.JoinRoomCommand}" 
                                         Background="#684756" Foreground="White" FontWeight="Bold" 
                                         HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="12" CornerRadius="4"/>
@@ -219,7 +220,7 @@
                                 <TextBlock Text="{Binding GameBoard.NetworkStatus}" Foreground="#AB8476" FontSize="12" TextAlignment="Center" TextWrapping="Wrap"/>
                             </Border>
 
-                            <Button Content="✕ Annulla" Command="{Binding GameBoard.BackToModeSelectionCommand}" Background="Transparent" Foreground="#AAAABB" HorizontalAlignment="Center"/>
+                            <Button Content="Annulla" Command="{Binding GameBoard.BackToModeSelectionCommand}" Background="Transparent" Foreground="#AAAABB" HorizontalAlignment="Center"/>
                         </StackPanel>
                     </Border>
                 </Grid>
@@ -228,7 +229,7 @@
                 <Grid IsVisible="{Binding GameBoard.IsBoardViewVisible}">
                     <Grid ColumnDefinitions="*, 380">
                         
-                        <!-- SCACCHIERA AMPIA CENTRALE (CON CORNER MARKERS) -->
+                        <!-- SCACCHIERA CENTRALE CON CORNER MARKERS -->
                         <Viewbox Grid.Column="0" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center">
                             <Border BorderBrush="#684756" BorderThickness="4" CornerRadius="2">
                                 <ItemsControl ItemsSource="{Binding GameBoard.Squares}">
@@ -295,7 +296,7 @@
                             <Grid RowDefinitions="Auto, Auto, Auto, *, Auto">
                                 <Grid Grid.Row="0" ColumnDefinitions="*, Auto" Margin="0,0,0,6">
                                     <TextBlock Grid.Column="0" Text="PARTITA IN CORSO" FontSize="14" FontWeight="Black" Foreground="#AB8476" VerticalAlignment="Center"/>
-                                    <Button Grid.Column="1" Content="✕ Esci" Command="{Binding GameBoard.BackToModeSelectionCommand}" Background="#684756" Foreground="White" FontSize="11" Padding="8,4" CornerRadius="3"/>
+                                    <Button Grid.Column="1" Content="Esci" Command="{Binding GameBoard.BackToModeSelectionCommand}" Background="#684756" Foreground="White" FontSize="11" Padding="8,4" CornerRadius="3"/>
                                 </Grid>
                                 <Separator Grid.Row="1" Background="#684756" Margin="0,0,0,10"/>
                                 
@@ -393,18 +394,19 @@
                     <Border Background="#E0101018" IsVisible="{Binding GameBoard.IsVictoryModalActive}" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
                         <Border Background="#3D314A" BorderBrush="#684756" BorderThickness="2" CornerRadius="10" Padding="30" Width="440" HorizontalAlignment="Center" VerticalAlignment="Center">
                             <StackPanel Spacing="16" HorizontalAlignment="Center">
-                                <TextBlock Text="🏆 PARTITA CONCLUSA 🏆" FontSize="14" FontWeight="Bold" Foreground="#AB8476" HorizontalAlignment="Center"/>
+                                <TextBlock Text="PARTITA CONCLUSA" FontSize="14" FontWeight="Bold" Foreground="#AB8476" HorizontalAlignment="Center"/>
                                 <TextBlock Text="{Binding GameBoard.VictoryTitle}" FontSize="24" FontWeight="Black" Foreground="White" TextAlignment="Center" TextWrapping="Wrap"/>
                                 <TextBlock Text="{Binding GameBoard.VictoryMessage}" FontSize="14" Foreground="#FFD500" HorizontalAlignment="Center"/>
                                 <Border Background="#1A1423" CornerRadius="4" Padding="10" Margin="0,5">
                                     <TextBlock Text="{Binding GameBoard.VictoryDeltaScore}" Foreground="White" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center"/>
                                 </Border>
-                                <Button Content="Torna alle Modalità" Command="{Binding GameBoard.BackToModeSelectionCommand}" Background="#96705B" Foreground="White" FontWeight="Bold" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="12" CornerRadius="4"/>
+                                <Button Content="Torna alle Modalita" Command="{Binding GameBoard.BackToModeSelectionCommand}" Background="#96705B" Foreground="White" FontWeight="Bold" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="12" CornerRadius="4"/>
                             </StackPanel>
                         </Border>
                     </Border>
 
-                    <!-- MODALE PROMOZIONE -->
+           
+                   <!-- MODALE PROMOZIONE -->
                     <Border Background="#D0101018" IsVisible="{Binding GameBoard.IsPromotionModalActive}" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
                         <Border Background="#3D314A" BorderBrush="#684756" BorderThickness="2" CornerRadius="8" Padding="20" Width="400" HorizontalAlignment="Center" VerticalAlignment="Center">
                             <StackPanel Spacing="15" HorizontalAlignment="Center">
@@ -429,10 +431,10 @@
                                 <TextBox Text="{Binding GameBoard.Player1Name}" Background="#1A1423" Foreground="White" BorderBrush="#684756"/>
                                 <TextBlock Text="Giocatore 2:" Foreground="White" FontSize="12"/>
                                 <TextBox Text="{Binding GameBoard.Player2Name}" Background="#1A1423" Foreground="White" BorderBrush="#684756"/>
-                                <Button Content="🎲 Sorteggia Colori" Command="{Binding GameBoard.DrawColorsCommand}" Background="#96705B" Foreground="White" FontWeight="Bold" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="10" CornerRadius="4"/>
+                                <Button Content="Sorteggia Colori" Command="{Binding GameBoard.DrawColorsCommand}" Background="#96705B" Foreground="White" FontWeight="Bold" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="10" CornerRadius="4"/>
                                 <TextBlock Text="{Binding GameBoard.DrawResultText}" Foreground="#AB8476" FontWeight="SemiBold" TextAlignment="Center" TextWrapping="Wrap"/>
                                 <Button Content="Inizia Partita" Command="{Binding GameBoard.StartMatchCommand}" IsVisible="{Binding GameBoard.CanStartMatch}" Background="#4CAF50" Foreground="White" FontWeight="Bold" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="12" CornerRadius="4"/>
-                                <Button Content="✕ Torna al Menù" Command="{Binding GameBoard.BackToModeSelectionCommand}" Background="Transparent" Foreground="#AAAABB" HorizontalAlignment="Center"/>
+                                <Button Content="Torna al Menu" Command="{Binding GameBoard.BackToModeSelectionCommand}" Background="Transparent" Foreground="#AAAABB" HorizontalAlignment="Center"/>
                             </StackPanel>
                         </Border>
                     </Border>
@@ -444,7 +446,7 @@
             <Grid IsVisible="{Binding IsStrategyViewVisible}" Margin="20">
                 <Border Background="#3D314A" CornerRadius="6" Padding="20" BorderBrush="#684756" BorderThickness="1" IsVisible="{Binding !StrategyViewer.IsViewerOpen}">
                     <Grid RowDefinitions="Auto, Auto, *">
-                        <TextBlock Grid.Row="0" Text="STRATEGY &amp; OPENINGS" FontSize="18" FontWeight="Black" Foreground="#AB8476" Margin="0,0,0,8"/>
+                        <TextBlock Grid.Row="0" Text="STRATEGY AND OPENINGS" FontSize="18" FontWeight="Black" Foreground="#AB8476" Margin="0,0,0,8"/>
                         <Separator Grid.Row="1" Background="#684756" Margin="0,0,0,15"/>
                         
                         <Grid Grid.Row="2" ColumnDefinitions="1.2*, *">
@@ -478,7 +480,7 @@
                                                     <Border Grid.Column="1" Background="#3D314A" CornerRadius="3" Padding="6,2" Margin="5,0">
                                                         <TextBlock Text="{Binding PlayerColor}" Foreground="#AB8476" FontSize="11" FontWeight="SemiBold"/>
                                                     </Border>
-                                                    <Button Grid.Column="2" Content="👁️ Visualizza" 
+                                                    <Button Grid.Column="2" Content="Visualizza" 
                                                             Command="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).ViewOpeningCommand}"
                                                             CommandParameter="{Binding}"
                                                             Background="#684756" Foreground="White" FontSize="11" Padding="8,4" CornerRadius="3"/>
@@ -505,7 +507,7 @@
                                     <TextBlock Text="Inserimento Sequenza Mosse:" Foreground="White" FontSize="11"/>
                                     <Grid ColumnDefinitions="*, Auto">
                                         <TextBox Grid.Column="0" Text="{Binding SingleMoveInput}" Watermark="Es: d4, d5, Nf3..." Background="#3D314A" Foreground="White" BorderBrush="#684756" Margin="0,0,5,0"/>
-                                        <Button Grid.Column="1" Content="➕ Aggiungi" Command="{Binding AddMoveChipCommand}" Background="#684756" Foreground="White" FontWeight="Bold"/>
+                                        <Button Grid.Column="1" Content="Aggiungi" Command="{Binding AddMoveChipCommand}" Background="#684756" Foreground="White" FontWeight="Bold"/>
                                     </Grid>
 
                                     <TextBlock Text="{Binding NextMoveTurnHelp}" Foreground="#AB8476" FontSize="11" FontWeight="SemiBold"/>
@@ -532,8 +534,8 @@
                                     <Button Content="Annulla Ultima Mossa" Command="{Binding RemoveLastMoveChipCommand}" Background="#3D314A" Foreground="#AAAABB" HorizontalAlignment="Right" FontSize="11" Padding="8,4"/>
 
                                     <Grid ColumnDefinitions="*, *" Margin="0,8,0,0">
-                                        <Button Grid.Column="0" Content="💾 Salva Strategia" Command="{Binding SaveOpeningCommand}" Background="#96705B" Foreground="White" FontWeight="Bold" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="8" Margin="0,0,4,0"/>
-                                        <Button Grid.Column="1" Content="❌ Elimina" Command="{Binding DeleteOpeningCommand}" IsVisible="{Binding IsEditing}" Background="#684756" Foreground="White" FontWeight="Bold" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="8" Margin="4,0,0,0"/>
+                                        <Button Grid.Column="0" Content="Salva Strategia" Command="{Binding SaveOpeningCommand}" Background="#96705B" Foreground="White" FontWeight="Bold" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="8" Margin="0,0,4,0"/>
+                                        <Button Grid.Column="1" Content="Elimina" Command="{Binding DeleteOpeningCommand}" IsVisible="{Binding IsEditing}" Background="#684756" Foreground="White" FontWeight="Bold" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="8" Margin="4,0,0,0"/>
                                     </Grid>
                                     
                                     <Button Content="Reset Modulo" Command="{Binding CancelEditCommand}" IsVisible="{Binding IsEditing}" Background="Transparent" Foreground="#AAAABB" HorizontalAlignment="Center" FontSize="11"/>
@@ -552,7 +554,7 @@
                                 <TextBlock Text="{Binding StrategyViewer.PlayerPerspective, StringFormat='Prospettiva: {0}'}" FontSize="12" Foreground="#AB8476"/>
                             </StackPanel>
 
-                            <Button Grid.Column="1" Content="✕ Torna all'Elenco" Command="{Binding StrategyViewer.CloseViewerCommand}"
+                            <Button Grid.Column="1" Content="Torna all'Elenco" Command="{Binding StrategyViewer.CloseViewerCommand}"
                                     Background="#684756" Foreground="White" FontWeight="Bold" Padding="12,6" CornerRadius="4"/>
                         </Grid>
 
@@ -583,10 +585,10 @@
                         <StackPanel Grid.Row="2" HorizontalAlignment="Center" Spacing="8" Margin="0,12,0,0">
                             <TextBlock Text="{Binding StrategyViewer.CurrentMoveText}" Foreground="#AB8476" FontSize="14" FontWeight="Bold" HorizontalAlignment="Center"/>
                             <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center">
-                                <Button Content="|◀ Inizio" Command="{Binding StrategyViewer.FirstMoveCommand}" Background="#1A1423" Foreground="White" Padding="10,6" CornerRadius="4"/>
-                                <Button Content="◀ Indietro" Command="{Binding StrategyViewer.PreviousMoveCommand}" Background="#96705B" Foreground="White" FontWeight="Bold" Padding="12,6" CornerRadius="4"/>
-                                <Button Content="Avanti ▶" Command="{Binding StrategyViewer.NextMoveCommand}" Background="#96705B" Foreground="White" FontWeight="Bold" Padding="12,6" CornerRadius="4"/>
-                                <Button Content="Fine ▶|" Command="{Binding StrategyViewer.LastMoveCommand}" Background="#1A1423" Foreground="White" Padding="10,6" CornerRadius="4"/>
+                                <Button Content="| Inizio" Command="{Binding StrategyViewer.FirstMoveCommand}" Background="#1A1423" Foreground="White" Padding="10,6" CornerRadius="4"/>
+                                <Button Content="Indietro" Command="{Binding StrategyViewer.PreviousMoveCommand}" Background="#96705B" Foreground="White" FontWeight="Bold" Padding="12,6" CornerRadius="4"/>
+                                <Button Content="Avanti" Command="{Binding StrategyViewer.NextMoveCommand}" Background="#96705B" Foreground="White" FontWeight="Bold" Padding="12,6" CornerRadius="4"/>
+                                <Button Content="Fine |" Command="{Binding StrategyViewer.LastMoveCommand}" Background="#1A1423" Foreground="White" Padding="10,6" CornerRadius="4"/>
                             </StackPanel>
                         </StackPanel>
                     </Grid>
@@ -599,7 +601,7 @@
                     <Grid RowDefinitions="Auto, Auto, *">
                         <Grid Grid.Row="0" ColumnDefinitions="*, Auto" Margin="0,0,0,8">
                             <TextBlock Grid.Column="0" Text="STORICO PARTITE SALVATE" FontSize="18" FontWeight="Black" Foreground="#AB8476"/>
-                            <Button Grid.Column="1" Content="🔄 Aggiorna" Command="{Binding History.LoadHistoryCommand}" Background="#96705B" Foreground="White" Padding="10,5" CornerRadius="4"/>
+                            <Button Grid.Column="1" Content="Aggiorna" Command="{Binding History.LoadHistoryCommand}" Background="#96705B" Foreground="White" Padding="10,5" CornerRadius="4"/>
                         </Grid>
                         <Separator Grid.Row="1" Background="#684756" Margin="0,0,0,15"/>
 
@@ -616,7 +618,7 @@
 
                                                 <TextBlock Grid.Column="1" Text="{Binding FormattedDate}" Foreground="#888888" FontSize="11" VerticalAlignment="Center" Margin="10,0"/>
 
-                                                <Button Grid.Column="2" Content="🗑️" 
+                                                <Button Grid.Column="2" Content="Elimina" 
                                                         Command="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).History.DeleteMatchCommand}"
                                                         CommandParameter="{Binding}"
                                                         Background="#684756" Foreground="White" Padding="6,4" CornerRadius="3"/>
@@ -669,7 +671,7 @@
             <Grid IsVisible="{Binding IsProfileViewVisible}" Margin="20">
                 <Border Background="#3D314A" CornerRadius="8" Padding="25" BorderBrush="#684756" BorderThickness="2" MaxWidth="1050" HorizontalAlignment="Center" VerticalAlignment="Center">
                     <Grid RowDefinitions="Auto, Auto, Auto, *">
-                        <TextBlock Grid.Row="0" Text="PROFILO GIOCATORE &amp; RANKING" FontSize="22" FontWeight="Black" Foreground="#AB8476" HorizontalAlignment="Center" Margin="0,0,0,6"/>
+                        <TextBlock Grid.Row="0" Text="PROFILO GIOCATORE AND RANKING" FontSize="22" FontWeight="Black" Foreground="#AB8476" HorizontalAlignment="Center" Margin="0,0,0,6"/>
                         <Separator Grid.Row="1" Background="#684756" Margin="0,0,0,15"/>
 
                         <!-- SEZIONE NICKNAME MODIFICABILE -->
@@ -677,24 +679,23 @@
                             <Grid ColumnDefinitions="Auto, *, Auto, Auto" VerticalAlignment="Center">
                                 <TextBlock Grid.Column="0" Text="Nickname:" Foreground="#AB8476" FontWeight="Bold" FontSize="13" VerticalAlignment="Center" Margin="0,0,12,0"/>
                                 <TextBox Grid.Column="1" Text="{Binding ProfileVm.EditableNickname}" Background="#3D314A" Foreground="White" BorderBrush="#684756" FontSize="13" Margin="0,0,12,0"/>
-                                <Button Grid.Column="2" Content="💾 Salva" Command="{Binding ProfileVm.SaveNicknameCommand}" Background="#96705B" Foreground="White" FontWeight="Bold" Padding="12,6" CornerRadius="4"/>
+                                <Button Grid.Column="2" Content="Salva" Command="{Binding ProfileVm.SaveNicknameCommand}" Background="#96705B" Foreground="White" FontWeight="Bold" Padding="12,6" CornerRadius="4"/>
                                 <TextBlock Grid.Column="3" Text="{Binding ProfileVm.SaveFeedback}" Foreground="#4CAF50" FontWeight="Bold" FontSize="12" VerticalAlignment="Center" Margin="12,0,0,0"/>
                             </Grid>
                         </Border>
 
-                        <!-- CARDS METRICHE: CAMPAGNA SOLO | BOT LADDER | ONLINE -->
+                        <!-- CARDS METRICHE: CAMPAGNA | SFIDA BOT | ONLINE -->
                         <Grid Grid.Row="3" ColumnDefinitions="*, 15, *, 15, *">
                             
-                            <!-- 1. CARD CAMPAGNA SOLO (PROGRESSIVA) -->
+                            <!-- 1. CARD CAMPAGNA -->
                             <Border Grid.Column="0" Background="#1A1423" CornerRadius="6" Padding="16" BorderBrush="#684756" BorderThickness="1">
                                 <StackPanel Spacing="10">
-                                    <TextBlock Text="🧗 CAMPAGNA SOLO" FontSize="14" FontWeight="Black" Foreground="#AB8476" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="CAMPAGNA" FontSize="14" FontWeight="Black" Foreground="#AB8476" HorizontalAlignment="Center"/>
                                     <Separator Background="#684756"/>
                                     
                                     <StackPanel HorizontalAlignment="Center" Spacing="1">
                                         <TextBlock Text="ELO CAMPAGNA" FontSize="10" FontWeight="Bold" Foreground="#AAAABB" HorizontalAlignment="Center"/>
                                         <TextBlock Text="{Binding ProfileVm.Profile.EloSoloCampaign}" FontSize="32" FontWeight="Black" Foreground="#FFD500" HorizontalAlignment="Center"/>
-                                        <TextBlock Text="{Binding ProfileVm.Profile.CurrentWinStreak, StringFormat='Streak: {0} 🔥'}" FontSize="11" FontWeight="Bold" Foreground="#FF9800" HorizontalAlignment="Center"/>
                                     </StackPanel>
 
                                     <Grid ColumnDefinitions="*, *" Margin="0,5,0,0">
@@ -703,7 +704,6 @@
                                             <TextBlock Text="Vittorie:" Foreground="#4CAF50" FontSize="11" FontWeight="Bold"/>
                                             <TextBlock Text="Patte:" Foreground="#FFD500" FontSize="11" FontWeight="Bold"/>
                                             <TextBlock Text="Sconfitte:" Foreground="#FF5252" FontSize="11" FontWeight="Bold"/>
-                                            <TextBlock Text="Miglior Streak:" Foreground="#FF9800" FontSize="11" FontWeight="Bold"/>
                                             <TextBlock Text="Win Rate:" Foreground="#AB8476" FontSize="11" FontWeight="Bold"/>
                                         </StackPanel>
                                         <StackPanel Grid.Column="1" HorizontalAlignment="Right" Spacing="4">
@@ -711,22 +711,21 @@
                                             <TextBlock Text="{Binding ProfileVm.Profile.CampaignWins}" Foreground="#4CAF50" FontSize="11" FontWeight="Bold"/>
                                             <TextBlock Text="{Binding ProfileVm.Profile.CampaignDraws}" Foreground="#FFD500" FontSize="11" FontWeight="Bold"/>
                                             <TextBlock Text="{Binding ProfileVm.Profile.CampaignLosses}" Foreground="#FF5252" FontSize="11" FontWeight="Bold"/>
-                                            <TextBlock Text="{Binding ProfileVm.Profile.BestWinStreak}" Foreground="#FF9800" FontSize="11" FontWeight="Bold"/>
                                             <TextBlock Text="{Binding ProfileVm.Profile.CampaignWinRate, StringFormat='{}{0}%'}" Foreground="#AB8476" FontSize="11" FontWeight="Bold"/>
                                         </StackPanel>
                                     </Grid>
                                 </StackPanel>
                             </Border>
 
-                            <!-- 2. CARD BOT LADDER (TIER FISSO) -->
+                            <!-- 2. CARD SFIDA BOT (LADDER) -->
                             <Border Grid.Column="2" Background="#1A1423" CornerRadius="6" Padding="16" BorderBrush="#684756" BorderThickness="1">
                                 <StackPanel Spacing="10">
-                                    <TextBlock Text="🤖 BOT LADDER" FontSize="14" FontWeight="Black" Foreground="#AB8476" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="SFIDA BOT" FontSize="14" FontWeight="Black" Foreground="#AB8476" HorizontalAlignment="Center"/>
                                     <Separator Background="#684756"/>
                                     
                                     <StackPanel HorizontalAlignment="Center" Spacing="1">
                                         <TextBlock Text="MAX BOT SCONFITTO" FontSize="10" FontWeight="Bold" Foreground="#AAAABB" HorizontalAlignment="Center"/>
-                                        <TextBlock Text="{Binding ProfileVm.Profile.HighestBotDefeatedElo, StringFormat='ELO {0}'}" FontSize="28" FontWeight="Black" Foreground="#4CAF50" HorizontalAlignment="Center"/>
+                                        <TextBlock Text="{Binding ProfileVm.Profile.HighestBotDefeatedDisplay}" FontSize="28" FontWeight="Black" Foreground="#4CAF50" HorizontalAlignment="Center"/>
                                         <TextBlock Text="Tier 200 - 2000" FontSize="11" Foreground="#AAAABB" HorizontalAlignment="Center"/>
                                     </StackPanel>
 
@@ -752,7 +751,7 @@
                             <!-- 3. CARD ONLINE ROOMS -->
                             <Border Grid.Column="4" Background="#1A1423" CornerRadius="6" Padding="16" BorderBrush="#684756" BorderThickness="1">
                                 <StackPanel Spacing="10">
-                                    <TextBlock Text="🌐 ONLINE ROOMS" FontSize="14" FontWeight="Black" Foreground="#AB8476" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="ONLINE ROOMS" FontSize="14" FontWeight="Black" Foreground="#AB8476" HorizontalAlignment="Center"/>
                                     <Separator Background="#684756"/>
 
                                     <StackPanel HorizontalAlignment="Center" Spacing="1">

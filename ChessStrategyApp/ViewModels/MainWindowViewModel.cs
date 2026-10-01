@@ -140,8 +140,8 @@ public partial class MainWindowViewModel : ObservableObject
     {
         ProfileVm = new ProfileViewModel(_profileService);
 
-        // Cablaggio evento completamento match contro Bot per aggiornamento Profilo e sblocco Ladder
-      GameBoard.OnBotMatchConcluded += async (soloType, outcome, botElo) =>
+        // Notifica match terminato per aggiornamento ELO o sblocco del Tier successivo
+        GameBoard.OnBotMatchConcluded += async (soloType, outcome, botElo) =>
         {
             if (soloType == GameViewModel.SoloType.Campaign)
             {
@@ -149,13 +149,11 @@ public partial class MainWindowViewModel : ObservableObject
             }
             else if (soloType == GameViewModel.SoloType.BotLadder)
             {
-                // 1. Aspetta che il file sia scritto e confermato sul disco
                 await ProfileVm.RegisterBotLadderResultAsync(outcome, botElo);
-                
-                // 2. Poi ricalcola i tier disponibili sulla UI
                 Dispatcher.UIThread.Post(() =>
                 {
                     RefreshAvailableTiers();
+                    // Preseleziona il nuovo livello sbloccato in caso di vittoria
                     if (outcome == 1.0 && AvailableLadderTiers.Count > 0)
                     {
                         SelectedLadderElo = AvailableLadderTiers.Last();
@@ -179,40 +177,52 @@ public partial class MainWindowViewModel : ObservableObject
             {
                 GameBoard.Nickname = ProfileVm.Profile.Nickname;
             }
+
+            // Popola i tier leggendo lo stato salvato nel file JSON
             RefreshAvailableTiers();
+
+            // All'avvio dell'applicazione preseleziona l'ultimo tier attualmente sbloccato
+            if (AvailableLadderTiers.Count > 0)
+            {
+                SelectedLadderElo = AvailableLadderTiers.Last();
+            }
         });
     }
-public void RefreshAvailableTiers()
+
+    public void RefreshAvailableTiers()
     {
         int maxDefeated = ProfileVm.Profile.HighestBotDefeatedElo;
-        
-        // Se non ha battuto nessuno (0), sblocca 200.
-        // Se ha battuto 200, sblocca fino a 400.
         int maxUnlockable = Math.Max(200, Math.Min(2000, maxDefeated + 200));
 
-        var newTiers = new List<int>();
+        var validTiers = new List<int>();
         for (int tier = 200; tier <= maxUnlockable; tier += 200)
         {
-            newTiers.Add(tier);
+            validTiers.Add(tier);
         }
 
-        AvailableLadderTiers.Clear();
-        foreach (var tier in newTiers)
+        if (!AvailableLadderTiers.SequenceEqual(validTiers))
         {
-            AvailableLadderTiers.Add(tier);
+            AvailableLadderTiers.Clear();
+            foreach (var tier in validTiers)
+            {
+                AvailableLadderTiers.Add(tier);
+            }
         }
 
+        // Se il valore selezionato non rientra piu tra quelli ammessi, fallback sul primo valido
         if (!AvailableLadderTiers.Contains(SelectedLadderElo))
         {
-            SelectedLadderElo = AvailableLadderTiers.LastOrDefault();
+            SelectedLadderElo = AvailableLadderTiers.FirstOrDefault();
         }
 
         OnPropertyChanged(nameof(SelectedLadderElo));
+        OnPropertyChanged(nameof(AvailableLadderTiers));
     }
+
     [RelayCommand]
     private void LaunchCampaign()
     {
-        GameBoard.StartCampaignMatch(ProfileVm.Profile.EloSoloCampaign, ProfileVm.Profile.CurrentWinStreak);
+        GameBoard.StartCampaignMatch(ProfileVm.Profile.EloSoloCampaign);
     }
 
     [RelayCommand]

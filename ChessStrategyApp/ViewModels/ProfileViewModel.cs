@@ -37,55 +37,32 @@ public partial class ProfileViewModel : ObservableObject
     {
         if (string.IsNullOrWhiteSpace(EditableNickname))
         {
-            SaveFeedback = "Il nickname non può essere vuoto.";
+            SaveFeedback = "Il nickname non puo essere vuoto.";
             return;
         }
 
         Profile.Nickname = EditableNickname.Trim();
         await _profileService.SaveProfileAsync(Profile);
         OnPropertyChanged(nameof(Profile));
-        SaveFeedback = "Nickname aggiornato con successo!";
+        SaveFeedback = "Nickname aggiornato con successo.";
     }
 
-    // 1. Partita Campagna Progressiva (Stile Oscar)
     public async Task RegisterCampaignResultAsync(double outcome, int botElo)
     {
         Profile.LastPlayedAt = DateTime.Now;
         Profile.CampaignMatchesPlayed++;
 
-        if (outcome == 1.0)
-        {
-            Profile.CampaignWins++;
-            Profile.CurrentWinStreak++;
-            if (Profile.CurrentWinStreak > Profile.BestWinStreak)
-            {
-                Profile.BestWinStreak = Profile.CurrentWinStreak;
-            }
-        }
-        else if (outcome == 0.5)
-        {
-            Profile.CampaignDraws++;
-            Profile.CurrentWinStreak = 0;
-        }
-        else
-        {
-            Profile.CampaignLosses++;
-            Profile.CurrentWinStreak = 0;
-        }
+        if (outcome == 1.0) Profile.CampaignWins++;
+        else if (outcome == 0.5) Profile.CampaignDraws++;
+        else Profile.CampaignLosses++;
 
-        Profile.EloSoloCampaign = ProfileService.CalculateNewElo(
-            Profile.EloSoloCampaign, 
-            botElo, 
-            outcome, 
-            Profile.CurrentWinStreak
-        );
+        Profile.EloSoloCampaign = ProfileService.CalculateNewElo(Profile.EloSoloCampaign, botElo, outcome);
 
         await _profileService.SaveProfileAsync(Profile);
         OnPropertyChanged(nameof(Profile));
     }
 
-    // 2. Partita Bot Ladder a Livello Fisso
-public async Task RegisterBotLadderResultAsync(double outcome, int botElo)
+    public async Task RegisterBotLadderResultAsync(double outcome, int botElo)
     {
         Profile.LastPlayedAt = DateTime.Now;
         Profile.BotLadderMatchesPlayed++;
@@ -93,7 +70,6 @@ public async Task RegisterBotLadderResultAsync(double outcome, int botElo)
         if (outcome == 1.0)
         {
             Profile.BotLadderWins++;
-            // Se batti l'elo 200, il massimo sconfitto deve diventare almeno 200
             if (botElo > Profile.HighestBotDefeatedElo)
             {
                 Profile.HighestBotDefeatedElo = botElo;
@@ -109,12 +85,9 @@ public async Task RegisterBotLadderResultAsync(double outcome, int botElo)
         }
 
         await _profileService.SaveProfileAsync(Profile);
-        var refreshed = Profile;
-        Profile = null!;
-        Profile = refreshed;
         OnPropertyChanged(nameof(Profile));
     }
-    // 3. Partita Online SignalR
+
     public async Task RegisterOnlineResultAsync(double outcome, int opponentElo)
     {
         Profile.LastPlayedAt = DateTime.Now;

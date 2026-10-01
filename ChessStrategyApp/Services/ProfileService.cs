@@ -43,10 +43,8 @@ public class ProfileService
             var profile = JsonSerializer.Deserialize<UserProfile>(json, JsonOptions);
             return profile ?? new UserProfile();
         }
-        catch (Exception ex)
+        catch
         {
-            Console.WriteLine($"[ProfileService] Errore lettura profilo: {ex.Message}");
-            // Non sovrascrive il file se c'è un errore di lettura temporaneo
             return new UserProfile();
         }
         finally
@@ -61,14 +59,13 @@ public class ProfileService
         try
         {
             string json = JsonSerializer.Serialize(profile, JsonOptions);
-            // Scrittura atomica per evitare file vuoti o corrotti in caso di crash/chiusura
             string tempFile = _filePath + ".tmp";
             await File.WriteAllTextAsync(tempFile, json);
             File.Move(tempFile, _filePath, overwrite: true);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ProfileService] Errore scrittura profilo: {ex.Message}");
+            Console.WriteLine($"Errore salvataggio profilo: {ex.Message}");
         }
         finally
         {
@@ -76,18 +73,12 @@ public class ProfileService
         }
     }
 
-    public static int CalculateNewElo(int currentElo, int opponentElo, double score, int streak = 0, int baseK = 32)
+    // Formula FIDE pura senza moltiplicatori streak
+    public static int CalculateNewElo(int currentElo, int opponentElo, double score, int kFactor = 32)
     {
-        int effectiveK = baseK;
-        if (score == 1.0 && streak >= 2)
-        {
-            effectiveK = Math.Min(64, baseK + (streak * 6));
-        }
-
         double exponent = (opponentElo - currentElo) / 400.0;
         double expectedScore = 1.0 / (1.0 + Math.Pow(10.0, exponent));
-        int delta = (int)Math.Round(effectiveK * (score - expectedScore));
-        
+        int delta = (int)Math.Round(kFactor * (score - expectedScore));
         int newElo = currentElo + delta;
         return Math.Max(100, newElo);
     }

@@ -159,7 +159,7 @@ public partial class GameViewModel : ObservableObject
     private string _activePlayerName = "In attesa";
 
     [ObservableProperty]
-    private string _activePlayerColorTag = "⚪ Bianco";
+    private string _activePlayerColorTag = "Bianco";
 
     [ObservableProperty]
     private bool _isWhiteActive = true;
@@ -237,7 +237,6 @@ public partial class GameViewModel : ObservableObject
 
         _engine.OnMoveExecuted += () => Dispatcher.UIThread.Post(RefreshBoardFromEngine);
 
-        // Cablaggio eventi SignalR
         _network.OnConnected += () => Dispatcher.UIThread.Post(() =>
         {
             NetworkStatus = "Connesso al server...";
@@ -246,7 +245,7 @@ public partial class GameViewModel : ObservableObject
         _network.OnRoomCreated += (code) => Dispatcher.UIThread.Post(() =>
         {
             IsConnecting = false;
-            NetworkStatus = $"Stanza [{code}] creata! In attesa che l'avversario entri (colori casuali 50/50)...";
+            NetworkStatus = $"Stanza [{code}] creata! In attesa che l'avversario entri...";
         });
 
         _network.OnJoinFailed += (err) => Dispatcher.UIThread.Post(() =>
@@ -265,13 +264,13 @@ public partial class GameViewModel : ObservableObject
             {
                 WhitePlayerName = string.IsNullOrWhiteSpace(Nickname) ? "Tu" : Nickname.Trim();
                 BlackPlayerName = opponentName;
-                NetworkStatus = $"Sorteggio: Sei il BIANCO! Avversario: {opponentName}";
+                NetworkStatus = $"Sorteggio: Sei il Bianco. Avversario: {opponentName}";
             }
             else
             {
                 WhitePlayerName = opponentName;
                 BlackPlayerName = string.IsNullOrWhiteSpace(Nickname) ? "Tu" : Nickname.Trim();
-                NetworkStatus = $"Sorteggio: Sei il NERO! Avversario: {opponentName}";
+                NetworkStatus = $"Sorteggio: Sei il Nero. Avversario: {opponentName}";
             }
 
             IsP2PConfigVisible = false;
@@ -309,7 +308,7 @@ public partial class GameViewModel : ObservableObject
         _network.OnOpponentLeft += () => Dispatcher.UIThread.Post(() =>
         {
             StatusMessage = "L'avversario ha abbandonato la partita.";
-            NetworkStatus = "Stanza chiusa: l'avversario si è disconnesso.";
+            NetworkStatus = "Stanza chiusa: l'avversario si e disconnesso.";
         });
 
         _network.OnConnectionFailed += (err) => Dispatcher.UIThread.Post(() =>
@@ -366,7 +365,6 @@ public partial class GameViewModel : ObservableObject
         UpdateTimerDisplay();
         ClearHighlights();
 
-        // Evidenziazione Corner Markers
         if (_lastMoveCoordinates.HasValue)
         {
             var m = _lastMoveCoordinates.Value;
@@ -388,7 +386,6 @@ public partial class GameViewModel : ObservableObject
             }
         }
 
-        // Calcolo e filtraggio catturati
         var (whiteCaps, blackCaps, advantage) = _engine.GetCapturedPiecesAndScore();
         UpdateCapturedLists(whiteCaps, blackCaps);
 
@@ -421,9 +418,8 @@ public partial class GameViewModel : ObservableObject
 
         IsWhiteActive = _engine.Turn == Player.White;
         ActivePlayerName = IsWhiteActive ? WhitePlayerName : BlackPlayerName;
-        ActivePlayerColorTag = IsWhiteActive ? "⚪ Bianco" : "⚫ Nero";
+        ActivePlayerColorTag = IsWhiteActive ? "Bianco" : "Nero";
 
-        // Gestione esiti regolamentari
         if (_engine.IsGameOver)
         {
             if (!_matchSaved)
@@ -446,7 +442,7 @@ public partial class GameViewModel : ObservableObject
                 }
                 else
                 {
-                    StatusMessage = "Partita conclusa in Parità.";
+                    StatusMessage = "Partita conclusa in Parita.";
                     _ = SaveCurrentMatchAsync("Patta", "Regolamentare");
                 }
             }
@@ -478,7 +474,7 @@ public partial class GameViewModel : ObservableObject
 
     private void RecordMoveInHistory(string from, string to, bool isWhiteTurn)
     {
-        string record = $"{from} → {to}";
+        string record = $"{from} -> {to}";
         if (isWhiteTurn)
             WhiteMovesHistory.Add(record);
         else
@@ -531,15 +527,15 @@ public partial class GameViewModel : ObservableObject
         }
     }
 
-    // --- GESTIONE BOT MODES ---
-    public void StartCampaignMatch(int playerElo, int winStreak)
+    // --- GESTIONE BOT (METODI UNICI SENZA DUPLICATI) ---
+    public void StartCampaignMatch(int playerElo)
     {
         CurrentGameMode = GameMode.Solo;
         ActiveSoloType = SoloType.Campaign;
-        CurrentBotElo = Math.Max(200, playerElo + (winStreak * 25));
+        CurrentBotElo = playerElo;
 
         WhitePlayerName = string.IsNullOrWhiteSpace(Nickname) ? "Tu" : Nickname.Trim();
-        BlackPlayerName = $"Oscar (Bot {CurrentBotElo})";
+        BlackPlayerName = $"Bot Campagna ({CurrentBotElo})";
 
         StartSoloGame();
     }
@@ -551,7 +547,7 @@ public partial class GameViewModel : ObservableObject
         CurrentBotElo = selectedElo;
 
         WhitePlayerName = string.IsNullOrWhiteSpace(Nickname) ? "Tu" : Nickname.Trim();
-        BlackPlayerName = $"Bot Tier {CurrentBotElo}";
+        BlackPlayerName = $"Bot Sfida Tier {CurrentBotElo}";
 
         StartSoloGame();
     }
@@ -832,7 +828,7 @@ public partial class GameViewModel : ObservableObject
         WhitePlayerName = p1IsWhite ? Player1Name.Trim() : Player2Name.Trim();
         BlackPlayerName = p1IsWhite ? Player2Name.Trim() : Player1Name.Trim();
 
-        DrawResultText = $"Sorteggio completato:\n⚪ Bianco: {WhitePlayerName}\n⚫ Nero: {BlackPlayerName}";
+        DrawResultText = $"Sorteggio completato:\nBianco: {WhitePlayerName}\nNero: {BlackPlayerName}";
         CanStartMatch = true;
     }
 
@@ -866,13 +862,13 @@ public partial class GameViewModel : ObservableObject
         RefreshBoardFromEngine();
     }
 
-   private async Task SaveCurrentMatchAsync(string winner, string reason)
+    private async Task SaveCurrentMatchAsync(string winner, string reason)
     {
         _matchSaved = true;
 
         var (_, _, advantage) = _engine.GetCapturedPiecesAndScore();
         string deltaString = advantage == 0 
-            ? "Parità materiale" 
+            ? "Parita materiale" 
             : (advantage > 0 ? $"+{advantage} per il Bianco" : $"+{Math.Abs(advantage)} per il Nero");
 
         if (winner == "Patta")
@@ -889,24 +885,19 @@ public partial class GameViewModel : ObservableObject
         VictoryDeltaScore = $"Differenza Materiale: {deltaString}";
         IsVictoryModalActive = true;
 
-        // NOTIFICA AL PROFILO CON ESITO CERTO (SENZA COMPARAZIONE NICKNAME FRAGILE)
+        // DETERMINAZIONE OGGETTIVA DELL'ESITO PER IL BOT
         if (CurrentGameMode == GameMode.Solo && ActiveSoloType != SoloType.None)
         {
-            double outcome;
+            double outcome = 0.0;
             if (winner == "Patta")
             {
                 outcome = 0.5;
             }
             else if (winner.Equals(WhitePlayerName, StringComparison.OrdinalIgnoreCase))
             {
-                outcome = 1.0; // Ha vinto il Bianco (Giocatore umano)
-            }
-            else
-            {
-                outcome = 0.0; // Ha vinto il Nero (Bot)
+                outcome = 1.0;
             }
 
-            // Invochiamo l'evento passando il tier giocato
             OnBotMatchConcluded?.Invoke(ActiveSoloType, outcome, CurrentBotElo);
         }
 
