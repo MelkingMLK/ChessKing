@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Security.Cryptography;
 using Avalonia.Threading;
 using ChessDotNet;
 using ChessDotNet.Pieces;
@@ -24,7 +25,6 @@ public class GameEngineService
     public Player Turn => _game.WhoseTurn;
     public bool IsGameOver => IsCheckmate() || IsStalemate() || IsDrawByRepetition();
 
-    // Esposizione per il motore decisionale del Bot
     public ChessGame RawGameInstance => _game;
 
     public GameEngineService()
@@ -80,6 +80,92 @@ public class GameEngineService
         }
     }
 
+    public void ShuffleInitialSetup()
+    {
+        ResetGame();
+
+        var board = new Piece[8][];
+        for (int r = 0; r < 8; r++)
+        {
+            board[r] = new Piece[8];
+        }
+
+        // Setup fazione Bianca (righe 7 e 6)
+        PlaceShuffledFaction(board, Player.White, backRank: 7, frontRank: 6);
+
+        // Setup fazione Nera (righe 0 e 1)
+        PlaceShuffledFaction(board, Player.Black, backRank: 0, frontRank: 1);
+
+        var customCreation = new GameCreationData
+        {
+            Board = board,
+            WhoseTurn = Player.White,
+            CanWhiteCastleKingSide = false,
+            CanWhiteCastleQueenSide = false,
+            CanBlackCastleKingSide = false,
+            CanBlackCastleQueenSide = false
+        };
+
+        _game = new ChessGame(customCreation);
+        _positionHistory.Clear();
+        TrackCurrentPosition();
+        OnMoveExecuted?.Invoke();
+    }
+
+    private void PlaceShuffledFaction(Piece[][] board, Player player, int backRank, int frontRank)
+    {
+        var pool = new List<Piece>
+        {
+            new Queen(player),
+            new Rook(player), new Rook(player),
+            new Bishop(player), new Bishop(player),
+            new Knight(player), new Knight(player),
+            new Pawn(player), new Pawn(player), new Pawn(player), new Pawn(player),
+            new Pawn(player), new Pawn(player), new Pawn(player), new Pawn(player)
+        };
+
+        ShuffleList(pool);
+
+        // Il Re è vincolato tassativamente a una delle 8 caselle della prima traversa
+        int kingCol = RandomNumberGenerator.GetInt32(8);
+        board[backRank][kingCol] = new King(player);
+
+        var availableSlots = new List<(int Row, int Col)>();
+        for (int c = 0; c < 8; c++)
+        {
+            if (c != kingCol) availableSlots.Add((backRank, c));
+            availableSlots.Add((frontRank, c));
+        }
+
+        ShuffleList(availableSlots);
+
+        for (int i = 0; i < pool.Count; i++)
+        {
+            var slot = availableSlots[i];
+            board[slot.Row][slot.Col] = pool[i];
+        }
+    }
+
+    private static void ShuffleList<T>(IList<T> list)
+    {
+        int n = list.Count;
+        while (n > 1)
+        {
+            n--;
+            int k = RandomNumberGenerator.GetInt32(n + 1);
+            (list[k], list[n]) = (list[n], list[k]);
+        }
+    }
+
+    public void LoadCustomFen(string fen)
+    {
+        ResetGame();
+        _game = new ChessGame(fen);
+        _positionHistory.Clear();
+        TrackCurrentPosition();
+        OnMoveExecuted?.Invoke();
+    }
+
     public Piece? GetPieceAt(int file, int rank)
     {
         var pos = new Position((File)file, rank);
@@ -126,8 +212,9 @@ public class GameEngineService
         return false;
     }
 
-    public bool TryMove(string fromSquare, string toSquare, char promotion = ' ')
+    public bool TryMoveWithSan(string fromSquare, string toSquare, char promotion, out string sanNotation)
     {
+        sanNotation = string.Empty;
         if (fromSquare.Length < 2 || toSquare.Length < 2) return false;
 
         int fromFile = fromSquare[0] - 'a';
@@ -138,17 +225,63 @@ public class GameEngineService
         var fromPos = new Position((File)fromFile, fromRank);
         var toPos = new Position((File)toFile, toRank);
 
+        var movingPiece = _game.GetPieceAt(fromPos);
+        var targetPiece = _game.GetPieceAt(toPos);
+
         Move move = promotion != ' ' ? new Move(fromPos, toPos, Turn, promotion) : new Move(fromPos, toPos, Turn);
 
-        if (_game.IsValidMove(move))
+        if (!_game.IsValidMove(move)) return false;
+
+        bool isCapture = targetPiece != null || (movingPiece is Pawn && fromFile != toFile);
+        string san = string.Empty;
+
+        if (movingPiece is King && Math.Abs(fromFile - toFile) == 2)
         {
-            _game.MakeMove(move, true);
-            TrackCurrentPosition();
-            OnMoveExecuted?.Invoke();
-            return true;
+            san = toFile > fromFile ? "O-O" : "O-O-O";
+        }
+        else if (movingPiece is Pawn)
+        {
+            if (isCapture)
+            {
+                san = $"{fromSquare[0]}x{toSquare}";
+            }
+            else
+            {
+                san = toSquare;
+            }
+
+            if (promotion != ' ')
+            {
+                san += $"={char.ToUpperInvariant(promotion)}";
+            }
+        }
+        else if (movingPiece != null)
+        {
+            char pieceChar = char.ToUpperInvariant(movingPiece.GetFenCharacter());
+            string captureMarker = isCapture ? "x" : string.Empty;
+            san = $"{pieceChar}{captureMarker}{toSquare}";
         }
 
-        return false;
+        _game.MakeMove(move, true);
+        TrackCurrentPosition();
+
+        if (IsCheckmate())
+        {
+            san += "#";
+        }
+        else if (IsPlayerInCheck(Turn))
+        {
+            san += "+";
+        }
+
+        sanNotation = san;
+        OnMoveExecuted?.Invoke();
+        return true;
+    }
+
+    public bool TryMove(string fromSquare, string toSquare, char promotion = ' ')
+    {
+        return TryMoveWithSan(fromSquare, toSquare, promotion, out _);
     }
 
     private void TrackCurrentPosition()

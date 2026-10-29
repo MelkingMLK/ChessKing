@@ -12,7 +12,7 @@ public class SignalRClientService
 
     public event Action<string>? OnRoomCreated;
     public event Action<string>? OnJoinFailed;
-    public event Action<string, string>? OnGameStarted;
+    public event Action<string, string, string, string>? OnGameStarted; // (color, opponent, matchType, initialFen)
     public event Action<string>? OnMoveReceived;
     public event Action? OnOpponentLeft;
     public event Action? OnConnected;
@@ -30,13 +30,11 @@ public class SignalRClientService
         _hubConnection = new HubConnectionBuilder()
             .WithUrl(serverUrl, options =>
             {
-                // Consente WebSockets diretti o LongPolling senza blocchi CORS
                 options.Transports = HttpTransportType.WebSockets | HttpTransportType.LongPolling;
                 options.HttpMessageHandlerFactory = (message) =>
                 {
                     if (message is HttpClientHandler clientHandler)
                     {
-                        // Evita rifiuti SSL in caso di localhost autoprodotto
                         clientHandler.ServerCertificateCustomValidationCallback = (_, _, _, _) => true;
                     }
                     return message;
@@ -47,7 +45,8 @@ public class SignalRClientService
 
         _hubConnection.On<string>("RoomCreated", code => OnRoomCreated?.Invoke(code));
         _hubConnection.On<string>("JoinFailed", reason => OnJoinFailed?.Invoke(reason));
-        _hubConnection.On<string, string>("GameStarted", (color, opponent) => OnGameStarted?.Invoke(color, opponent));
+        _hubConnection.On<string, string, string, string>("GameStarted", (color, opponent, matchType, fen) => 
+            OnGameStarted?.Invoke(color, opponent, matchType, fen));
         _hubConnection.On<string>("ReceiveMove", move => OnMoveReceived?.Invoke(move));
         _hubConnection.On("OpponentLeft", () => OnOpponentLeft?.Invoke());
 
@@ -55,12 +54,12 @@ public class SignalRClientService
         OnConnected?.Invoke();
     }
 
-    public async Task CreateRoomAsync(string serverUrl, string roomCode, string hostName)
+    public async Task CreateRoomAsync(string serverUrl, string roomCode, string hostName, string matchType, string initialFen)
     {
         try
         {
             await EnsureConnectedAsync(serverUrl);
-            await _hubConnection!.InvokeAsync("CreateRoom", roomCode, hostName);
+            await _hubConnection!.InvokeAsync("CreateRoom", roomCode, hostName, matchType, initialFen);
         }
         catch (Exception ex)
         {

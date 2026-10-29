@@ -26,8 +26,23 @@ public partial class ChessSquare : ObservableObject
     [ObservableProperty]
     private bool _isTargetMove;
 
-    // Sfondo naturale della scacchiera, pulito e invariato
+    // Coordinate a bordo casella
+    [ObservableProperty]
+    private string _rankCoordinate = string.Empty;
+
+    [ObservableProperty]
+    private string _fileCoordinate = string.Empty;
+
+    public bool HasRankCoordinate => !string.IsNullOrEmpty(RankCoordinate);
+    public bool HasFileCoordinate => !string.IsNullOrEmpty(FileCoordinate);
+
+    // Modalità Cieca (BGC): nasconde l'identità del pezzo nemico
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PieceGlyph))]
+    private bool _isObscured;
+
     public string BackgroundBrush => IsDark ? "#000000" : "#FFFFFF";
+    public string CoordinateBrush => IsDark ? "#684756" : "#AB8476";
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(PieceGlyph))]
@@ -38,16 +53,30 @@ public partial class ChessSquare : ObservableObject
     [NotifyPropertyChangedFor(nameof(PieceForeground))]
     private string _pieceColor = string.Empty;  
 
-    public string PieceGlyph => Piece switch
+    public string PieceGlyph
     {
-        "K" => PieceColor == "White" ? "♔" : "♚",
-        "Q" => PieceColor == "White" ? "♕" : "♛",
-        "R" => PieceColor == "White" ? "♖" : "♜",
-        "B" => PieceColor == "White" ? "♗" : "♝",
-        "N" => PieceColor == "White" ? "♞" : "♞", 
-        "P" => PieceColor == "White" ? "♙" : "♟",
-        _ => string.Empty
-    };
+        get
+        {
+            if (string.IsNullOrEmpty(Piece)) return string.Empty;
+
+            // Se la pedina è mascherata dalla modalità BGC
+            if (IsObscured)
+            {
+                return "■";
+            }
+
+            return Piece switch
+            {
+                "K" => PieceColor == "White" ? "♔" : "♚",
+                "Q" => PieceColor == "White" ? "♕" : "♛",
+                "R" => PieceColor == "White" ? "♖" : "♜",
+                "B" => PieceColor == "White" ? "♗" : "♝",
+                "N" => PieceColor == "White" ? "♘" : "♞",
+                "P" => PieceColor == "White" ? "♙" : "♟",
+                _ => string.Empty
+            };
+        }
+    }
 
     public string PieceForeground => PieceColor == "White" ? "#AB8476" : "#8675A9";
 

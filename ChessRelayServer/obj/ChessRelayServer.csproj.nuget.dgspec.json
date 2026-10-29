@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "/Users/alessandro/Documents/sFaCioLaTe/Programs/C#/ChessKing/ChessRelayServer/ChessRelayServer.csproj": {}
+    "/Users/alessandro/Documents/sFaCioLaTe/Programs/MEDium/ChessKing/ChessRelayServer/ChessRelayServer.csproj": {}
   },
   "projects": {
-    "/Users/alessandro/Documents/sFaCioLaTe/Programs/C#/ChessKing/ChessRelayServer/ChessRelayServer.csproj": {
+    "/Users/alessandro/Documents/sFaCioLaTe/Programs/MEDium/ChessKing/ChessRelayServer/ChessRelayServer.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "/Users/alessandro/Documents/sFaCioLaTe/Programs/C#/ChessKing/ChessRelayServer/ChessRelayServer.csproj",
+        "projectUniqueName": "/Users/alessandro/Documents/sFaCioLaTe/Programs/MEDium/ChessKing/ChessRelayServer/ChessRelayServer.csproj",
         "projectName": "ChessRelayServer",
-        "projectPath": "/Users/alessandro/Documents/sFaCioLaTe/Programs/C#/ChessKing/ChessRelayServer/ChessRelayServer.csproj",
+        "projectPath": "/Users/alessandro/Documents/sFaCioLaTe/Programs/MEDium/ChessKing/ChessRelayServer/ChessRelayServer.csproj",
         "packagesPath": "/Users/alessandro/.nuget/packages/",
-        "outputPath": "/Users/alessandro/Documents/sFaCioLaTe/Programs/C#/ChessKing/ChessRelayServer/obj/",
+        "outputPath": "/Users/alessandro/Documents/sFaCioLaTe/Programs/MEDium/ChessKing/ChessRelayServer/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "/Users/alessandro/.nuget/NuGet/NuGet.Config"

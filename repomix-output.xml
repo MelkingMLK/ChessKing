@@ -83,6 +83,7 @@ ChessStrategyApp/
   repomix-output.xml
   ViewLocator.cs
 .gitignore
+fix.md
 README:txt
 setup_MacOs.sh
 setup_Windows.bat
@@ -90,6 +91,12 @@ setup_Windows.bat
 
 <files>
 This section contains the contents of the repository's files.
+
+<file path="fix.md">
+-ELO ROOM
+-mosse anche mangia
+-?coordinate
+</file>
 
 <file path="ChessRelayServer/Properties/launchSettings.json">
 {
@@ -327,59 +334,6 @@ public class MoveNode
     
     // Le risposte a questa mossa sono annidate qui dentro (Bivi/Varianti)
     public List<MoveNode> NextMoves { get; set; } = new(); 
-}
-</file>
-
-<file path="ChessStrategyApp/Models/UserProfile.cs">
-using System;
-
-namespace ChessStrategyApp.Models;
-
-public class UserProfile
-{
-    public string Nickname { get; set; } = "Player_" + Random.Shared.Next(100, 999);
-
-    // --- ELO RATINGS ---
-    public int EloOnline { get; set; } = 1000;          // Default Online: 1000
-    public int EloSoloCampaign { get; set; } = 200;      // Default Campagna Progressiva: 200
-
-    // --- PROGRESSIONE CAMPAGNA PROGRESSIVA (STILE OSCAR) ---
-    public int CurrentWinStreak { get; set; } = 0;
-    public int BestWinStreak { get; set; } = 0;
-    public int CampaignMatchesPlayed { get; set; } = 0;
-    public int CampaignWins { get; set; } = 0;
-    public int CampaignLosses { get; set; } = 0;
-    public int CampaignDraws { get; set; } = 0;
-
-    // --- BOT LADDER FISSO (TIER 200 - 2000) ---
-    public int HighestBotDefeatedElo { get; set; } = 0; // 0 = nessuno ancora sconfitto
-    public int BotLadderMatchesPlayed { get; set; } = 0;
-    public int BotLadderWins { get; set; } = 0;
-    public int BotLadderLosses { get; set; } = 0;
-    public int BotLadderDraws { get; set; } = 0;
-
-    // --- ONLINE ROOMS ---
-    public int OnlineMatchesPlayed { get; set; } = 0;
-    public int OnlineWins { get; set; } = 0;
-    public int OnlineLosses { get; set; } = 0;
-    public int OnlineDraws { get; set; } = 0;
-
-    // --- METADATI ---
-    public DateTime CreatedAt { get; set; } = DateTime.Now;
-    public DateTime LastPlayedAt { get; set; } = DateTime.Now;
-
-    // --- METRICHE DERIVATE ---
-    public double CampaignWinRate => CampaignMatchesPlayed > 0 
-        ? Math.Round((double)CampaignWins / CampaignMatchesPlayed * 100, 1) 
-        : 0.0;
-
-    public double BotLadderWinRate => BotLadderMatchesPlayed > 0 
-        ? Math.Round((double)BotLadderWins / BotLadderMatchesPlayed * 100, 1) 
-        : 0.0;
-
-    public double OnlineWinRate => OnlineMatchesPlayed > 0 
-        ? Math.Round((double)OnlineWins / OnlineMatchesPlayed * 100, 1) 
-        : 0.0;
 }
 </file>
 
@@ -729,103 +683,6 @@ public class MatchHistoryService
 }
 </file>
 
-<file path="ChessStrategyApp/Services/ProfileService.cs">
-using System;
-using System.IO;
-using System.Text.Json;
-using System.Threading;
-using System.Threading.Tasks;
-using ChessStrategyApp.Models;
-
-namespace ChessStrategyApp.Services;
-
-public class ProfileService
-{
-    private readonly string _filePath;
-    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
-    private static readonly SemaphoreSlim FileLock = new(1, 1);
-
-    public ProfileService()
-    {
-        string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        string folder = Path.Combine(appData, "ChessKing");
-        Directory.CreateDirectory(folder);
-        _filePath = Path.Combine(folder, "user_profile.json");
-    }
-
-    public async Task<UserProfile> LoadProfileAsync()
-    {
-        await FileLock.WaitAsync();
-        try
-        {
-            if (!File.Exists(_filePath))
-            {
-                var newProfile = new UserProfile();
-                string defaultJson = JsonSerializer.Serialize(newProfile, JsonOptions);
-                await File.WriteAllTextAsync(_filePath, defaultJson);
-                return newProfile;
-            }
-
-            string json = await File.ReadAllTextAsync(_filePath);
-            if (string.IsNullOrWhiteSpace(json))
-            {
-                return new UserProfile();
-            }
-
-            var profile = JsonSerializer.Deserialize<UserProfile>(json, JsonOptions);
-            return profile ?? new UserProfile();
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[ProfileService] Errore lettura profilo: {ex.Message}");
-            // Non sovrascrive il file se c'è un errore di lettura temporaneo
-            return new UserProfile();
-        }
-        finally
-        {
-            FileLock.Release();
-        }
-    }
-
-    public async Task SaveProfileAsync(UserProfile profile)
-    {
-        await FileLock.WaitAsync();
-        try
-        {
-            string json = JsonSerializer.Serialize(profile, JsonOptions);
-            // Scrittura atomica per evitare file vuoti o corrotti in caso di crash/chiusura
-            string tempFile = _filePath + ".tmp";
-            await File.WriteAllTextAsync(tempFile, json);
-            File.Move(tempFile, _filePath, overwrite: true);
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[ProfileService] Errore scrittura profilo: {ex.Message}");
-        }
-        finally
-        {
-            FileLock.Release();
-        }
-    }
-
-    public static int CalculateNewElo(int currentElo, int opponentElo, double score, int streak = 0, int baseK = 32)
-    {
-        int effectiveK = baseK;
-        if (score == 1.0 && streak >= 2)
-        {
-            effectiveK = Math.Min(64, baseK + (streak * 6));
-        }
-
-        double exponent = (opponentElo - currentElo) / 400.0;
-        double expectedScore = 1.0 / (1.0 + Math.Pow(10.0, exponent));
-        int delta = (int)Math.Round(effectiveK * (score - expectedScore));
-        
-        int newElo = currentElo + delta;
-        return Math.Max(100, newElo);
-    }
-}
-</file>
-
 <file path="ChessStrategyApp/Services/SignalRClientService.cs">
 using System;
 using System.Net.Http;
@@ -1084,141 +941,6 @@ public partial class HistoryViewModel : ObservableObject
         }
 
         await _historyService.SaveMatchesAsync(Matches);
-    }
-}
-</file>
-
-<file path="ChessStrategyApp/ViewModels/ProfileViewModel.cs">
-using System;
-using System.Threading.Tasks;
-using CommunityToolkit.Mvvm.ComponentModel;
-using CommunityToolkit.Mvvm.Input;
-using ChessStrategyApp.Models;
-using ChessStrategyApp.Services;
-
-namespace ChessStrategyApp.ViewModels;
-
-public partial class ProfileViewModel : ObservableObject
-{
-    private readonly ProfileService _profileService;
-
-    [ObservableProperty]
-    private UserProfile _profile = new();
-
-    [ObservableProperty]
-    private string _editableNickname = string.Empty;
-
-    [ObservableProperty]
-    private string _saveFeedback = string.Empty;
-
-    public ProfileViewModel(ProfileService profileService)
-    {
-        _profileService = profileService;
-    }
-
-    public async Task InitializeAsync()
-    {
-        Profile = await _profileService.LoadProfileAsync();
-        EditableNickname = Profile.Nickname;
-        SaveFeedback = string.Empty;
-    }
-
-    [RelayCommand]
-    private async Task SaveNickname()
-    {
-        if (string.IsNullOrWhiteSpace(EditableNickname))
-        {
-            SaveFeedback = "Il nickname non può essere vuoto.";
-            return;
-        }
-
-        Profile.Nickname = EditableNickname.Trim();
-        await _profileService.SaveProfileAsync(Profile);
-        OnPropertyChanged(nameof(Profile));
-        SaveFeedback = "Nickname aggiornato con successo!";
-    }
-
-    // 1. Partita Campagna Progressiva (Stile Oscar)
-    public async Task RegisterCampaignResultAsync(double outcome, int botElo)
-    {
-        Profile.LastPlayedAt = DateTime.Now;
-        Profile.CampaignMatchesPlayed++;
-
-        if (outcome == 1.0)
-        {
-            Profile.CampaignWins++;
-            Profile.CurrentWinStreak++;
-            if (Profile.CurrentWinStreak > Profile.BestWinStreak)
-            {
-                Profile.BestWinStreak = Profile.CurrentWinStreak;
-            }
-        }
-        else if (outcome == 0.5)
-        {
-            Profile.CampaignDraws++;
-            Profile.CurrentWinStreak = 0;
-        }
-        else
-        {
-            Profile.CampaignLosses++;
-            Profile.CurrentWinStreak = 0;
-        }
-
-        Profile.EloSoloCampaign = ProfileService.CalculateNewElo(
-            Profile.EloSoloCampaign, 
-            botElo, 
-            outcome, 
-            Profile.CurrentWinStreak
-        );
-
-        await _profileService.SaveProfileAsync(Profile);
-        OnPropertyChanged(nameof(Profile));
-    }
-
-    // 2. Partita Bot Ladder a Livello Fisso
-public async Task RegisterBotLadderResultAsync(double outcome, int botElo)
-    {
-        Profile.LastPlayedAt = DateTime.Now;
-        Profile.BotLadderMatchesPlayed++;
-
-        if (outcome == 1.0)
-        {
-            Profile.BotLadderWins++;
-            // Se batti l'elo 200, il massimo sconfitto deve diventare almeno 200
-            if (botElo > Profile.HighestBotDefeatedElo)
-            {
-                Profile.HighestBotDefeatedElo = botElo;
-            }
-        }
-        else if (outcome == 0.5)
-        {
-            Profile.BotLadderDraws++;
-        }
-        else
-        {
-            Profile.BotLadderLosses++;
-        }
-
-        await _profileService.SaveProfileAsync(Profile);
-        var refreshed = Profile;
-        Profile = null!;
-        Profile = refreshed;
-        OnPropertyChanged(nameof(Profile));
-    }
-    // 3. Partita Online SignalR
-    public async Task RegisterOnlineResultAsync(double outcome, int opponentElo)
-    {
-        Profile.LastPlayedAt = DateTime.Now;
-        Profile.OnlineMatchesPlayed++;
-
-        if (outcome == 1.0) Profile.OnlineWins++;
-        else if (outcome == 0.5) Profile.OnlineDraws++;
-        else Profile.OnlineLosses++;
-
-        Profile.EloOnline = ProfileService.CalculateNewElo(Profile.EloOnline, opponentElo, outcome);
-
-        await _profileService.SaveProfileAsync(Profile);
-        OnPropertyChanged(nameof(Profile));
     }
 }
 </file>
@@ -6633,6 +6355,62 @@ pause
 </Project>
 </file>
 
+<file path="ChessStrategyApp/Models/UserProfile.cs">
+using System;
+
+namespace ChessStrategyApp.Models;
+
+public class UserProfile
+{
+    public string Nickname { get; set; } = "Player_" + Random.Shared.Next(100, 999);
+
+    // ELO Ratings
+    public int EloOnline { get; set; } = 1000;
+    public int EloSoloCampaign { get; set; } = 200;
+
+    // Statistiche Campagna
+    public int CampaignMatchesPlayed { get; set; } = 0;
+    public int CampaignWins { get; set; } = 0;
+    public int CampaignLosses { get; set; } = 0;
+    public int CampaignDraws { get; set; } = 0;
+
+    // Statistiche Sfida Bot (Tier Fisso)
+    // 0 = Nessun bot ancora sconfitto
+    public int HighestBotDefeatedElo { get; set; } = 0;
+    public int BotLadderMatchesPlayed { get; set; } = 0;
+    public int BotLadderWins { get; set; } = 0;
+    public int BotLadderLosses { get; set; } = 0;
+    public int BotLadderDraws { get; set; } = 0;
+
+    // Statistiche Online
+    public int OnlineMatchesPlayed { get; set; } = 0;
+    public int OnlineWins { get; set; } = 0;
+    public int OnlineLosses { get; set; } = 0;
+    public int OnlineDraws { get; set; } = 0;
+
+    // Metadati
+    public DateTime CreatedAt { get; set; } = DateTime.Now;
+    public DateTime LastPlayedAt { get; set; } = DateTime.Now;
+
+    // Proprietà calcolate per la UI
+    public string HighestBotDefeatedDisplay => HighestBotDefeatedElo > 0 
+        ? $"ELO {HighestBotDefeatedElo}" 
+        : "Nessuno";
+
+    public double CampaignWinRate => CampaignMatchesPlayed > 0 
+        ? Math.Round((double)CampaignWins / CampaignMatchesPlayed * 100, 1) 
+        : 0.0;
+
+    public double BotLadderWinRate => BotLadderMatchesPlayed > 0 
+        ? Math.Round((double)BotLadderWins / BotLadderMatchesPlayed * 100, 1) 
+        : 0.0;
+
+    public double OnlineWinRate => OnlineMatchesPlayed > 0 
+        ? Math.Round((double)OnlineWins / OnlineMatchesPlayed * 100, 1) 
+        : 0.0;
+}
+</file>
+
 <file path="ChessStrategyApp/Services/GameEngineService.cs">
 using System;
 using System.Collections.Generic;
@@ -6884,6 +6662,293 @@ public class GameEngineService
 }
 </file>
 
+<file path="ChessStrategyApp/Services/ProfileService.cs">
+using System;
+using System.IO;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
+using ChessStrategyApp.Models;
+
+namespace ChessStrategyApp.Services;
+
+public class ProfileService
+{
+    private readonly string _filePath;
+    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
+    private static readonly SemaphoreSlim FileLock = new(1, 1);
+
+    public ProfileService()
+    {
+        string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        string folder = Path.Combine(appData, "ChessKing");
+        Directory.CreateDirectory(folder);
+        _filePath = Path.Combine(folder, "user_profile.json");
+    }
+
+    public async Task<UserProfile> LoadProfileAsync()
+    {
+        await FileLock.WaitAsync();
+        try
+        {
+            if (!File.Exists(_filePath))
+            {
+                var newProfile = new UserProfile();
+                string defaultJson = JsonSerializer.Serialize(newProfile, JsonOptions);
+                await File.WriteAllTextAsync(_filePath, defaultJson);
+                return newProfile;
+            }
+
+            string json = await File.ReadAllTextAsync(_filePath);
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                return new UserProfile();
+            }
+
+            var profile = JsonSerializer.Deserialize<UserProfile>(json, JsonOptions);
+            return profile ?? new UserProfile();
+        }
+        catch
+        {
+            return new UserProfile();
+        }
+        finally
+        {
+            FileLock.Release();
+        }
+    }
+
+    public async Task SaveProfileAsync(UserProfile profile)
+    {
+        await FileLock.WaitAsync();
+        try
+        {
+            string json = JsonSerializer.Serialize(profile, JsonOptions);
+            string tempFile = _filePath + ".tmp";
+            await File.WriteAllTextAsync(tempFile, json);
+            File.Move(tempFile, _filePath, overwrite: true);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Errore salvataggio profilo: {ex.Message}");
+        }
+        finally
+        {
+            FileLock.Release();
+        }
+    }
+
+    // Formula FIDE pura senza moltiplicatori streak
+    public static int CalculateNewElo(int currentElo, int opponentElo, double score, int kFactor = 32)
+    {
+        double exponent = (opponentElo - currentElo) / 400.0;
+        double expectedScore = 1.0 / (1.0 + Math.Pow(10.0, exponent));
+        int delta = (int)Math.Round(kFactor * (score - expectedScore));
+        int newElo = currentElo + delta;
+        return Math.Max(100, newElo);
+    }
+}
+</file>
+
+<file path="ChessStrategyApp/ViewModels/ProfileViewModel.cs">
+using System;
+using System.Threading.Tasks;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using ChessStrategyApp.Models;
+using ChessStrategyApp.Services;
+
+namespace ChessStrategyApp.ViewModels;
+
+public partial class ProfileViewModel : ObservableObject
+{
+    private readonly ProfileService _profileService;
+
+    [ObservableProperty]
+    private UserProfile _profile = new();
+
+    [ObservableProperty]
+    private string _editableNickname = string.Empty;
+
+    [ObservableProperty]
+    private string _saveFeedback = string.Empty;
+
+    public ProfileViewModel(ProfileService profileService)
+    {
+        _profileService = profileService;
+    }
+
+    public async Task InitializeAsync()
+    {
+        Profile = await _profileService.LoadProfileAsync();
+        EditableNickname = Profile.Nickname;
+        SaveFeedback = string.Empty;
+    }
+
+    [RelayCommand]
+    private async Task SaveNickname()
+    {
+        if (string.IsNullOrWhiteSpace(EditableNickname))
+        {
+            SaveFeedback = "Il nickname non puo essere vuoto.";
+            return;
+        }
+
+        Profile.Nickname = EditableNickname.Trim();
+        await _profileService.SaveProfileAsync(Profile);
+        OnPropertyChanged(nameof(Profile));
+        SaveFeedback = "Nickname aggiornato con successo.";
+    }
+
+    public async Task RegisterCampaignResultAsync(double outcome, int botElo)
+    {
+        Profile.LastPlayedAt = DateTime.Now;
+        Profile.CampaignMatchesPlayed++;
+
+        if (outcome == 1.0) Profile.CampaignWins++;
+        else if (outcome == 0.5) Profile.CampaignDraws++;
+        else Profile.CampaignLosses++;
+
+        Profile.EloSoloCampaign = ProfileService.CalculateNewElo(Profile.EloSoloCampaign, botElo, outcome);
+
+        await _profileService.SaveProfileAsync(Profile);
+        OnPropertyChanged(nameof(Profile));
+    }
+
+    public async Task RegisterBotLadderResultAsync(double outcome, int botElo)
+    {
+        Profile.LastPlayedAt = DateTime.Now;
+        Profile.BotLadderMatchesPlayed++;
+
+        if (outcome == 1.0)
+        {
+            Profile.BotLadderWins++;
+            if (botElo > Profile.HighestBotDefeatedElo)
+            {
+                Profile.HighestBotDefeatedElo = botElo;
+            }
+        }
+        else if (outcome == 0.5)
+        {
+            Profile.BotLadderDraws++;
+        }
+        else
+        {
+            Profile.BotLadderLosses++;
+        }
+
+        await _profileService.SaveProfileAsync(Profile);
+        OnPropertyChanged(nameof(Profile));
+    }
+
+    public async Task RegisterOnlineResultAsync(double outcome, int opponentElo)
+    {
+        Profile.LastPlayedAt = DateTime.Now;
+        Profile.OnlineMatchesPlayed++;
+
+        if (outcome == 1.0) Profile.OnlineWins++;
+        else if (outcome == 0.5) Profile.OnlineDraws++;
+        else Profile.OnlineLosses++;
+
+        Profile.EloOnline = ProfileService.CalculateNewElo(Profile.EloOnline, opponentElo, outcome);
+
+        await _profileService.SaveProfileAsync(Profile);
+        OnPropertyChanged(nameof(Profile));
+    }
+}
+</file>
+
+<file path="ChessStrategyApp/ChessStrategyApp.csproj">
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+
+<ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.1.3" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.1.3" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.1.3" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.1.3" />
+    <PackageReference Include="Avalonia.Diagnostics" Version="11.1.3" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
+    <!-- Libreria Scacchi Ufficiale -->
+    <PackageReference Include="ChessDotNet" Version="0.10.0" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.12" />
+  </ItemGroup>
+</Project>
+</file>
+
+<file path="ChessStrategyApp/Models/ChessSquare.cs">
+using CommunityToolkit.Mvvm.ComponentModel;
+
+namespace ChessStrategyApp.Models;
+
+public partial class ChessSquare : ObservableObject
+{
+    public int Row { get; }
+    public int Column { get; }
+    public bool IsDark => (Row + Column) % 2 != 0;
+
+    [ObservableProperty]
+    private bool _isLastMoveHighlight;
+
+    [ObservableProperty]
+    private bool _isSelected;
+
+    [ObservableProperty]
+    private bool _isInCheck;
+
+    [ObservableProperty]
+    private bool _isCheckmated;
+
+    [ObservableProperty]
+    private bool _isPromoted;
+
+    [ObservableProperty]
+    private bool _isTargetMove;
+
+    // Sfondo naturale della scacchiera, pulito e invariato
+    public string BackgroundBrush => IsDark ? "#000000" : "#FFFFFF";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PieceGlyph))]
+    private string _piece = string.Empty;       
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PieceGlyph))]
+    [NotifyPropertyChangedFor(nameof(PieceForeground))]
+    private string _pieceColor = string.Empty;  
+
+    public string PieceGlyph => Piece switch
+    {
+        "K" => PieceColor == "White" ? "♔" : "♚",
+        "Q" => PieceColor == "White" ? "♕" : "♛",
+        "R" => PieceColor == "White" ? "♖" : "♜",
+        "B" => PieceColor == "White" ? "♗" : "♝",
+        "N" => PieceColor == "White" ? "♞" : "♞", 
+        "P" => PieceColor == "White" ? "♙" : "♟",
+        _ => string.Empty
+    };
+
+    public string PieceForeground => PieceColor == "White" ? "#AB8476" : "#8675A9";
+
+    public ChessSquare(int row, int col, string piece = "", string pieceColor = "")
+    {
+        Row = row;
+        Column = col;
+        _piece = piece;
+        _pieceColor = pieceColor;
+    }
+
+    public void TriggerBackgroundUpdate() => OnPropertyChanged(nameof(BackgroundBrush));
+}
+</file>
+
 <file path="ChessStrategyApp/ViewModels/MainWindowViewModel.cs">
 using System;
 using System.Collections.Generic;
@@ -7027,8 +7092,8 @@ public partial class MainWindowViewModel : ObservableObject
     {
         ProfileVm = new ProfileViewModel(_profileService);
 
-        // Cablaggio evento completamento match contro Bot per aggiornamento Profilo e sblocco Ladder
-      GameBoard.OnBotMatchConcluded += async (soloType, outcome, botElo) =>
+        // Notifica match terminato per aggiornamento ELO o sblocco del Tier successivo
+        GameBoard.OnBotMatchConcluded += async (soloType, outcome, botElo) =>
         {
             if (soloType == GameViewModel.SoloType.Campaign)
             {
@@ -7036,13 +7101,11 @@ public partial class MainWindowViewModel : ObservableObject
             }
             else if (soloType == GameViewModel.SoloType.BotLadder)
             {
-                // 1. Aspetta che il file sia scritto e confermato sul disco
                 await ProfileVm.RegisterBotLadderResultAsync(outcome, botElo);
-                
-                // 2. Poi ricalcola i tier disponibili sulla UI
                 Dispatcher.UIThread.Post(() =>
                 {
                     RefreshAvailableTiers();
+                    // Preseleziona il nuovo livello sbloccato in caso di vittoria
                     if (outcome == 1.0 && AvailableLadderTiers.Count > 0)
                     {
                         SelectedLadderElo = AvailableLadderTiers.Last();
@@ -7066,40 +7129,52 @@ public partial class MainWindowViewModel : ObservableObject
             {
                 GameBoard.Nickname = ProfileVm.Profile.Nickname;
             }
+
+            // Popola i tier leggendo lo stato salvato nel file JSON
             RefreshAvailableTiers();
+
+            // All'avvio dell'applicazione preseleziona l'ultimo tier attualmente sbloccato
+            if (AvailableLadderTiers.Count > 0)
+            {
+                SelectedLadderElo = AvailableLadderTiers.Last();
+            }
         });
     }
-public void RefreshAvailableTiers()
+
+    public void RefreshAvailableTiers()
     {
         int maxDefeated = ProfileVm.Profile.HighestBotDefeatedElo;
-        
-        // Se non ha battuto nessuno (0), sblocca 200.
-        // Se ha battuto 200, sblocca fino a 400.
         int maxUnlockable = Math.Max(200, Math.Min(2000, maxDefeated + 200));
 
-        var newTiers = new List<int>();
+        var validTiers = new List<int>();
         for (int tier = 200; tier <= maxUnlockable; tier += 200)
         {
-            newTiers.Add(tier);
+            validTiers.Add(tier);
         }
 
-        AvailableLadderTiers.Clear();
-        foreach (var tier in newTiers)
+        if (!AvailableLadderTiers.SequenceEqual(validTiers))
         {
-            AvailableLadderTiers.Add(tier);
+            AvailableLadderTiers.Clear();
+            foreach (var tier in validTiers)
+            {
+                AvailableLadderTiers.Add(tier);
+            }
         }
 
+        // Se il valore selezionato non rientra piu tra quelli ammessi, fallback sul primo valido
         if (!AvailableLadderTiers.Contains(SelectedLadderElo))
         {
-            SelectedLadderElo = AvailableLadderTiers.LastOrDefault();
+            SelectedLadderElo = AvailableLadderTiers.FirstOrDefault();
         }
 
         OnPropertyChanged(nameof(SelectedLadderElo));
+        OnPropertyChanged(nameof(AvailableLadderTiers));
     }
+
     [RelayCommand]
     private void LaunchCampaign()
     {
-        GameBoard.StartCampaignMatch(ProfileVm.Profile.EloSoloCampaign, ProfileVm.Profile.CurrentWinStreak);
+        GameBoard.StartCampaignMatch(ProfileVm.Profile.EloSoloCampaign);
     }
 
     [RelayCommand]
@@ -7291,97 +7366,6 @@ public void RefreshAvailableTiers()
             current = current.NextMoves.Count > 0 ? current.NextMoves[0] : null!;
         }
     }
-}
-</file>
-
-<file path="ChessStrategyApp/ChessStrategyApp.csproj">
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
-    <ApplicationManifest>app.manifest</ApplicationManifest>
-    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
-  </PropertyGroup>
-
-<ItemGroup>
-    <PackageReference Include="Avalonia" Version="11.1.3" />
-    <PackageReference Include="Avalonia.Desktop" Version="11.1.3" />
-    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.1.3" />
-    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.1.3" />
-    <PackageReference Include="Avalonia.Diagnostics" Version="11.1.3" />
-    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
-    <!-- Libreria Scacchi Ufficiale -->
-    <PackageReference Include="ChessDotNet" Version="0.10.0" />
-    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.12" />
-  </ItemGroup>
-</Project>
-</file>
-
-<file path="ChessStrategyApp/Models/ChessSquare.cs">
-using CommunityToolkit.Mvvm.ComponentModel;
-
-namespace ChessStrategyApp.Models;
-
-public partial class ChessSquare : ObservableObject
-{
-    public int Row { get; }
-    public int Column { get; }
-    public bool IsDark => (Row + Column) % 2 != 0;
-
-    [ObservableProperty]
-    private bool _isLastMoveHighlight;
-
-    [ObservableProperty]
-    private bool _isSelected;
-
-    [ObservableProperty]
-    private bool _isInCheck;
-
-    [ObservableProperty]
-    private bool _isCheckmated;
-
-    [ObservableProperty]
-    private bool _isPromoted;
-
-    [ObservableProperty]
-    private bool _isTargetMove;
-
-    // Sfondo naturale della scacchiera, pulito e invariato
-    public string BackgroundBrush => IsDark ? "#000000" : "#FFFFFF";
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(PieceGlyph))]
-    private string _piece = string.Empty;       
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(PieceGlyph))]
-    [NotifyPropertyChangedFor(nameof(PieceForeground))]
-    private string _pieceColor = string.Empty;  
-
-    public string PieceGlyph => Piece switch
-    {
-        "K" => PieceColor == "White" ? "♔" : "♚",
-        "Q" => PieceColor == "White" ? "♕" : "♛",
-        "R" => PieceColor == "White" ? "♖" : "♜",
-        "B" => PieceColor == "White" ? "♗" : "♝",
-        "N" => PieceColor == "White" ? "♞" : "♞", 
-        "P" => PieceColor == "White" ? "♙" : "♟",
-        _ => string.Empty
-    };
-
-    public string PieceForeground => PieceColor == "White" ? "#AB8476" : "#8675A9";
-
-    public ChessSquare(int row, int col, string piece = "", string pieceColor = "")
-    {
-        Row = row;
-        Column = col;
-        _piece = piece;
-        _pieceColor = pieceColor;
-    }
-
-    public void TriggerBackgroundUpdate() => OnPropertyChanged(nameof(BackgroundBrush));
 }
 </file>
 
@@ -7645,7 +7629,7 @@ public partial class GameViewModel : ObservableObject
     private string _activePlayerName = "In attesa";
 
     [ObservableProperty]
-    private string _activePlayerColorTag = "⚪ Bianco";
+    private string _activePlayerColorTag = "Bianco";
 
     [ObservableProperty]
     private bool _isWhiteActive = true;
@@ -7723,7 +7707,6 @@ public partial class GameViewModel : ObservableObject
 
         _engine.OnMoveExecuted += () => Dispatcher.UIThread.Post(RefreshBoardFromEngine);
 
-        // Cablaggio eventi SignalR
         _network.OnConnected += () => Dispatcher.UIThread.Post(() =>
         {
             NetworkStatus = "Connesso al server...";
@@ -7732,7 +7715,7 @@ public partial class GameViewModel : ObservableObject
         _network.OnRoomCreated += (code) => Dispatcher.UIThread.Post(() =>
         {
             IsConnecting = false;
-            NetworkStatus = $"Stanza [{code}] creata! In attesa che l'avversario entri (colori casuali 50/50)...";
+            NetworkStatus = $"Stanza [{code}] creata! In attesa che l'avversario entri...";
         });
 
         _network.OnJoinFailed += (err) => Dispatcher.UIThread.Post(() =>
@@ -7751,13 +7734,13 @@ public partial class GameViewModel : ObservableObject
             {
                 WhitePlayerName = string.IsNullOrWhiteSpace(Nickname) ? "Tu" : Nickname.Trim();
                 BlackPlayerName = opponentName;
-                NetworkStatus = $"Sorteggio: Sei il BIANCO! Avversario: {opponentName}";
+                NetworkStatus = $"Sorteggio: Sei il Bianco. Avversario: {opponentName}";
             }
             else
             {
                 WhitePlayerName = opponentName;
                 BlackPlayerName = string.IsNullOrWhiteSpace(Nickname) ? "Tu" : Nickname.Trim();
-                NetworkStatus = $"Sorteggio: Sei il NERO! Avversario: {opponentName}";
+                NetworkStatus = $"Sorteggio: Sei il Nero. Avversario: {opponentName}";
             }
 
             IsP2PConfigVisible = false;
@@ -7795,7 +7778,7 @@ public partial class GameViewModel : ObservableObject
         _network.OnOpponentLeft += () => Dispatcher.UIThread.Post(() =>
         {
             StatusMessage = "L'avversario ha abbandonato la partita.";
-            NetworkStatus = "Stanza chiusa: l'avversario si è disconnesso.";
+            NetworkStatus = "Stanza chiusa: l'avversario si e disconnesso.";
         });
 
         _network.OnConnectionFailed += (err) => Dispatcher.UIThread.Post(() =>
@@ -7852,7 +7835,6 @@ public partial class GameViewModel : ObservableObject
         UpdateTimerDisplay();
         ClearHighlights();
 
-        // Evidenziazione Corner Markers
         if (_lastMoveCoordinates.HasValue)
         {
             var m = _lastMoveCoordinates.Value;
@@ -7874,7 +7856,6 @@ public partial class GameViewModel : ObservableObject
             }
         }
 
-        // Calcolo e filtraggio catturati
         var (whiteCaps, blackCaps, advantage) = _engine.GetCapturedPiecesAndScore();
         UpdateCapturedLists(whiteCaps, blackCaps);
 
@@ -7907,9 +7888,8 @@ public partial class GameViewModel : ObservableObject
 
         IsWhiteActive = _engine.Turn == Player.White;
         ActivePlayerName = IsWhiteActive ? WhitePlayerName : BlackPlayerName;
-        ActivePlayerColorTag = IsWhiteActive ? "⚪ Bianco" : "⚫ Nero";
+        ActivePlayerColorTag = IsWhiteActive ? "Bianco" : "Nero";
 
-        // Gestione esiti regolamentari
         if (_engine.IsGameOver)
         {
             if (!_matchSaved)
@@ -7932,7 +7912,7 @@ public partial class GameViewModel : ObservableObject
                 }
                 else
                 {
-                    StatusMessage = "Partita conclusa in Parità.";
+                    StatusMessage = "Partita conclusa in Parita.";
                     _ = SaveCurrentMatchAsync("Patta", "Regolamentare");
                 }
             }
@@ -7964,7 +7944,7 @@ public partial class GameViewModel : ObservableObject
 
     private void RecordMoveInHistory(string from, string to, bool isWhiteTurn)
     {
-        string record = $"{from} → {to}";
+        string record = $"{from} -> {to}";
         if (isWhiteTurn)
             WhiteMovesHistory.Add(record);
         else
@@ -8017,15 +7997,15 @@ public partial class GameViewModel : ObservableObject
         }
     }
 
-    // --- GESTIONE BOT MODES ---
-    public void StartCampaignMatch(int playerElo, int winStreak)
+    // --- GESTIONE BOT (METODI UNICI SENZA DUPLICATI) ---
+    public void StartCampaignMatch(int playerElo)
     {
         CurrentGameMode = GameMode.Solo;
         ActiveSoloType = SoloType.Campaign;
-        CurrentBotElo = Math.Max(200, playerElo + (winStreak * 25));
+        CurrentBotElo = playerElo;
 
         WhitePlayerName = string.IsNullOrWhiteSpace(Nickname) ? "Tu" : Nickname.Trim();
-        BlackPlayerName = $"Oscar (Bot {CurrentBotElo})";
+        BlackPlayerName = $"Bot Campagna ({CurrentBotElo})";
 
         StartSoloGame();
     }
@@ -8037,7 +8017,7 @@ public partial class GameViewModel : ObservableObject
         CurrentBotElo = selectedElo;
 
         WhitePlayerName = string.IsNullOrWhiteSpace(Nickname) ? "Tu" : Nickname.Trim();
-        BlackPlayerName = $"Bot Tier {CurrentBotElo}";
+        BlackPlayerName = $"Bot Sfida Tier {CurrentBotElo}";
 
         StartSoloGame();
     }
@@ -8318,7 +8298,7 @@ public partial class GameViewModel : ObservableObject
         WhitePlayerName = p1IsWhite ? Player1Name.Trim() : Player2Name.Trim();
         BlackPlayerName = p1IsWhite ? Player2Name.Trim() : Player1Name.Trim();
 
-        DrawResultText = $"Sorteggio completato:\n⚪ Bianco: {WhitePlayerName}\n⚫ Nero: {BlackPlayerName}";
+        DrawResultText = $"Sorteggio completato:\nBianco: {WhitePlayerName}\nNero: {BlackPlayerName}";
         CanStartMatch = true;
     }
 
@@ -8352,13 +8332,13 @@ public partial class GameViewModel : ObservableObject
         RefreshBoardFromEngine();
     }
 
-   private async Task SaveCurrentMatchAsync(string winner, string reason)
+    private async Task SaveCurrentMatchAsync(string winner, string reason)
     {
         _matchSaved = true;
 
         var (_, _, advantage) = _engine.GetCapturedPiecesAndScore();
         string deltaString = advantage == 0 
-            ? "Parità materiale" 
+            ? "Parita materiale" 
             : (advantage > 0 ? $"+{advantage} per il Bianco" : $"+{Math.Abs(advantage)} per il Nero");
 
         if (winner == "Patta")
@@ -8375,24 +8355,19 @@ public partial class GameViewModel : ObservableObject
         VictoryDeltaScore = $"Differenza Materiale: {deltaString}";
         IsVictoryModalActive = true;
 
-        // NOTIFICA AL PROFILO CON ESITO CERTO (SENZA COMPARAZIONE NICKNAME FRAGILE)
+        // DETERMINAZIONE OGGETTIVA DELL'ESITO PER IL BOT
         if (CurrentGameMode == GameMode.Solo && ActiveSoloType != SoloType.None)
         {
-            double outcome;
+            double outcome = 0.0;
             if (winner == "Patta")
             {
                 outcome = 0.5;
             }
             else if (winner.Equals(WhitePlayerName, StringComparison.OrdinalIgnoreCase))
             {
-                outcome = 1.0; // Ha vinto il Bianco (Giocatore umano)
-            }
-            else
-            {
-                outcome = 0.0; // Ha vinto il Nero (Bot)
+                outcome = 1.0;
             }
 
-            // Invochiamo l'evento passando il tier giocato
             OnBotMatchConcluded?.Invoke(ActiveSoloType, outcome, CurrentBotElo);
         }
 
@@ -8426,7 +8401,7 @@ public partial class GameViewModel : ObservableObject
         x:Name="RootWindow"
         Title="ChessKing"
         Background="#1A1423"
-        Width="1320" Height="860">
+        Width="1340" Height="860">
 
     <Window.Styles>
         <!-- ANIMAZIONE SCACCO: TREMOLIO -->
@@ -8526,19 +8501,19 @@ public partial class GameViewModel : ObservableObject
                 
                 <!-- HUB SCELTA MODALITÀ -->
                 <Grid IsVisible="{Binding GameBoard.IsModeSelectionVisible}">
-                    <Border Background="#3D314A" CornerRadius="8" Padding="35" BorderBrush="#684756" BorderThickness="2" MaxWidth="960" MaxHeight="600" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Border Background="#3D314A" CornerRadius="8" Padding="30" BorderBrush="#684756" BorderThickness="2" MaxWidth="1050" MaxHeight="620" HorizontalAlignment="Center" VerticalAlignment="Center">
                         <Grid RowDefinitions="Auto, Auto, *">
-                            <TextBlock Grid.Row="0" Text="SELEZIONA MODALITÀ DI GIOCO" FontSize="26" FontWeight="Black" Foreground="#AB8476" HorizontalAlignment="Center" Margin="0,0,0,8"/>
-                            <TextBlock Grid.Row="1" Text="Scegli la tipologia di scontro o allenamento per questa sessione" FontSize="14" Foreground="#AAAABB" HorizontalAlignment="Center" Margin="0,0,0,30"/>
+                            <TextBlock Grid.Row="0" Text="SELEZIONA MODALITA DI GIOCO" FontSize="24" FontWeight="Black" Foreground="#AB8476" HorizontalAlignment="Center" Margin="0,0,0,6"/>
+                            <TextBlock Grid.Row="1" Text="Scegli la tipologia di partita o allenamento per questa sessione" FontSize="13" Foreground="#AAAABB" HorizontalAlignment="Center" Margin="0,0,0,25"/>
 
-                            <Grid Grid.Row="2" ColumnDefinitions="*, 15, *, 15, *">
+                            <Grid Grid.Row="2" ColumnDefinitions="*, 12, *, 12, *, 12, *">
                                 
-                                <!-- CARD LOCALE -->
-                                <Border Grid.Column="0" Background="#1A1423" CornerRadius="6" BorderBrush="#684756" BorderThickness="1" Padding="16">
+                                <!-- CARD 1: LOCALE -->
+                                <Border Grid.Column="0" Background="#1A1423" CornerRadius="6" BorderBrush="#684756" BorderThickness="1" Padding="14">
                                     <Grid RowDefinitions="Auto, *, Auto">
-                                        <TextBlock Grid.Row="0" Text="👥 LOCALE" FontSize="18" FontWeight="Black" Foreground="White" HorizontalAlignment="Center" Margin="0,5,0,8"/>
-                                        <TextBlock Grid.Row="1" Text="Pass and Play sullo stesso monitor. Sorteggio integrato dei colori, orologi sincronizzati e storico." 
-                                                   Foreground="#AB8476" FontSize="11" TextWrapping="Wrap" TextAlignment="Center" Margin="0,5"/>
+                                        <TextBlock Grid.Row="0" Text="LOCALE" FontSize="16" FontWeight="Black" Foreground="White" HorizontalAlignment="Center" Margin="0,4,0,8"/>
+                                        <TextBlock Grid.Row="1" Text="Pass and Play sullo stesso monitor con sorteggio colori e timer sincronizzati." 
+                                                   Foreground="#AB8476" FontSize="11" TextWrapping="Wrap" TextAlignment="Center" Margin="0,4"/>
                                         <Button Grid.Row="2" Content="GIOCA LOCALE" 
                                                 Command="{Binding GameBoard.SelectLocalModeCommand}"
                                                 Background="#96705B" Foreground="White" FontWeight="Bold"
@@ -8546,57 +8521,58 @@ public partial class GameViewModel : ObservableObject
                                     </Grid>
                                 </Border>
 
-                                <!-- CARD ONLINE ROOMS -->
-                                <Border Grid.Column="2" Background="#1A1423" CornerRadius="6" BorderBrush="#684756" BorderThickness="1" Padding="16">
+                                <!-- CARD 2: ONLINE ROOMS -->
+                                <Border Grid.Column="2" Background="#1A1423" CornerRadius="6" BorderBrush="#684756" BorderThickness="1" Padding="14">
                                     <Grid RowDefinitions="Auto, *, Auto">
-                                        <TextBlock Grid.Row="0" Text="🌐 ONLINE ROOMS" FontSize="18" FontWeight="Black" Foreground="White" HorizontalAlignment="Center" Margin="0,5,0,8"/>
-                                        <TextBlock Grid.Row="1" Text="Stanze private via WebSockets con SignalR. Sorteggio colori 50/50 e bypass NAT." 
-                                                   Foreground="#AB8476" FontSize="11" TextWrapping="Wrap" TextAlignment="Center" Margin="0,5"/>
-                                        <Button Grid.Row="2" Content="ONLINE" 
+                                        <TextBlock Grid.Row="0" Text="ONLINE ROOMS" FontSize="16" FontWeight="Black" Foreground="White" HorizontalAlignment="Center" Margin="0,4,0,8"/>
+                                        <TextBlock Grid.Row="1" Text="Partite private tramite SignalR con bypass NAT e sorteggio colori automatico." 
+                                                   Foreground="#AB8476" FontSize="11" TextWrapping="Wrap" TextAlignment="Center" Margin="0,4"/>
+                                        <Button Grid.Row="2" Content="GIOCA ONLINE" 
                                                 Command="{Binding GameBoard.SelectP2PModeCommand}"
                                                 Background="#684756" Foreground="White" FontWeight="Bold"
                                                 HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="10" CornerRadius="4"/>
                                     </Grid>
                                 </Border>
 
-                                <!-- CARD CAMPAGNA & BOT LADDER -->
-                                <Border Grid.Column="4" Background="#1A1423" CornerRadius="6" BorderBrush="#684756" BorderThickness="1" Padding="16">
+                                <!-- CARD 3: MODALITA CAMPAGNA -->
+                                <Border Grid.Column="4" Background="#1A1423" CornerRadius="6" BorderBrush="#684756" BorderThickness="1" Padding="14">
                                     <Grid RowDefinitions="Auto, *, Auto, Auto">
-                                        <TextBlock Grid.Row="0" Text="🤖 SFIDA I BOT" FontSize="18" FontWeight="Black" Foreground="White" HorizontalAlignment="Center" Margin="0,5,0,6"/>
-                                        
-                                        <!-- Scelta Campagna Progressiva -->
-                                        <StackPanel Grid.Row="1" Spacing="6" Margin="0,4,0,10">
-                                            <Button Content="{Binding ProfileVm.Profile.EloSoloCampaign, StringFormat='🧗 Campagna (ELO {0})'}" 
-                                                    Command="{Binding LaunchCampaignCommand}"
-                                                    Background="#96705B" Foreground="White" FontWeight="Bold"
-                                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="10" CornerRadius="4"/>
-                                            <TextBlock Text="{Binding ProfileVm.Profile.CurrentWinStreak, StringFormat='Streak: {0} 🔥'}" FontSize="11" Foreground="#FF9800" HorizontalAlignment="Center"/>
-                                        </StackPanel>
+                                        <TextBlock Grid.Row="0" Text="CAMPAGNA" FontSize="16" FontWeight="Black" Foreground="White" HorizontalAlignment="Center" Margin="0,4,0,8"/>
+                                        <TextBlock Grid.Row="1" Text="Scalata progressiva. L'avversario si calibra sul tuo ELO: vincendo sali di rating, perdendo scendi." 
+                                                   Foreground="#AB8476" FontSize="11" TextWrapping="Wrap" TextAlignment="Center" Margin="0,4"/>
+                                        <TextBlock Grid.Row="2" Text="{Binding ProfileVm.Profile.EloSoloCampaign, StringFormat='Tuo Rating: ELO {0}'}" 
+                                                   FontSize="12" FontWeight="Bold" Foreground="#FFD500" HorizontalAlignment="Center" Margin="0,0,0,10"/>
+                                        <Button Grid.Row="3" Content="GIOCA CAMPAGNA" 
+                                                Command="{Binding LaunchCampaignCommand}"
+                                                Background="#96705B" Foreground="White" FontWeight="Bold"
+                                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="10" CornerRadius="4"/>
+                                    </Grid>
+                                </Border>
 
-                                        <Separator Grid.Row="2" Background="#684756" Margin="0,0,0,10"/>
-
-                                        <!-- Scelta Bot Ladder Tier Fisso con Sblocco Dinamico -->
-                                        <!-- Scelta Bot Ladder Tier Fisso con Sblocco Dinamico -->
-                                        <StackPanel Grid.Row="3" Spacing="8">
-                                            <Grid ColumnDefinitions="Auto, *">
-                                                <TextBlock Grid.Column="0" Text="Tier Bot:" Foreground="#AB8476" FontWeight="Bold" FontSize="11" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                                <ComboBox Grid.Column="1" 
-                                                          ItemsSource="{Binding AvailableLadderTiers}" 
-                                                          SelectedItem="{Binding SelectedLadderElo, Mode=TwoWay}" 
-                                                          HorizontalAlignment="Stretch" 
-                                                          Background="#3D314A" Foreground="White" BorderBrush="#684756">
-                                                    <ComboBox.ItemTemplate>
-                                                        <DataTemplate>
-                                                            <TextBlock Text="{Binding StringFormat='ELO {0}'}" Foreground="White" FontWeight="SemiBold"/>
-                                                        </DataTemplate>
-                                                    </ComboBox.ItemTemplate>
-                                                </ComboBox>
-                                            </Grid>
-                                            <Button Content="Sfida Tier" 
-                                                    Command="{Binding LaunchBotLadderCommand}"
-                                                    Background="#684756" Foreground="White" FontWeight="Bold"
-                                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="8" CornerRadius="4"/>
-                                        </StackPanel>
+                                <!-- CARD 4: SFIDA BOT (LADDER A TIER) -->
+                                <Border Grid.Column="6" Background="#1A1423" CornerRadius="6" BorderBrush="#684756" BorderThickness="1" Padding="14">
+                                    <Grid RowDefinitions="Auto, *, Auto, Auto">
+                                        <TextBlock Grid.Row="0" Text="SFIDA BOT" FontSize="16" FontWeight="Black" Foreground="White" HorizontalAlignment="Center" Margin="0,4,0,8"/>
+                                        <TextBlock Grid.Row="1" Text="Livelli fissi da 200 a 2000. Sconfiggi ciascun bot per sbloccare il tier successivo." 
+                                                   Foreground="#AB8476" FontSize="11" TextWrapping="Wrap" TextAlignment="Center" Margin="0,4"/>
+                                        <Grid Grid.Row="2" ColumnDefinitions="Auto, *" Margin="0,0,0,10">
+                                            <TextBlock Grid.Column="0" Text="Livello:" Foreground="#AB8476" FontWeight="Bold" FontSize="11" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                            <ComboBox Grid.Column="1" 
+                                                      ItemsSource="{Binding AvailableLadderTiers}" 
+                                                      SelectedItem="{Binding SelectedLadderElo, Mode=TwoWay}" 
+                                                      HorizontalAlignment="Stretch" 
+                                                      Background="#3D314A" Foreground="White" BorderBrush="#684756">
+                                                <ComboBox.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <TextBlock Text="{Binding StringFormat='ELO {0}'}" Foreground="White" FontWeight="SemiBold"/>
+                                                    </DataTemplate>
+                                                </ComboBox.ItemTemplate>
+                                            </ComboBox>
+                                        </Grid>
+                                        <Button Grid.Row="3" Content="SFIDA TIER" 
+                                                Command="{Binding LaunchBotLadderCommand}"
+                                                Background="#684756" Foreground="White" FontWeight="Bold"
+                                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="10" CornerRadius="4"/>
                                     </Grid>
                                 </Border>
 
@@ -8610,7 +8586,7 @@ public partial class GameViewModel : ObservableObject
                     <Border Background="#3D314A" CornerRadius="8" Padding="30" BorderBrush="#684756" BorderThickness="2" Width="480" HorizontalAlignment="Center" VerticalAlignment="Center">
                         <StackPanel Spacing="14">
                             <TextBlock Text="CONNESSIONE ONLINE ROOMS" FontSize="18" FontWeight="Black" Foreground="#AB8476" HorizontalAlignment="Center"/>
-                            <TextBlock Text="Crea una stanza o entra con il codice. I colori verranno sorteggiati a caso (50/50)." Foreground="#AAAABB" FontSize="11" TextAlignment="Center" TextWrapping="Wrap"/>
+                            <TextBlock Text="Crea una stanza o entra con il codice. I colori verranno sorteggiati in modo casuale." Foreground="#AAAABB" FontSize="11" TextAlignment="Center" TextWrapping="Wrap"/>
                             <Separator Background="#684756"/>
 
                             <TextBlock Text="Tuo Nickname:" Foreground="White" FontSize="11"/>
@@ -8623,12 +8599,12 @@ public partial class GameViewModel : ObservableObject
                             <TextBox Text="{Binding GameBoard.RoomCode}" Watermark="Es: TORNEO1" Background="#1A1423" Foreground="White" BorderBrush="#684756"/>
 
                             <Grid ColumnDefinitions="*, 12, *" Margin="0,8,0,0">
-                                <Button Grid.Column="0" Content="🏠 Crea Stanza" 
+                                <Button Grid.Column="0" Content="Crea Stanza" 
                                         Command="{Binding GameBoard.CreateRoomCommand}" 
                                         Background="#96705B" Foreground="White" FontWeight="Bold" 
                                         HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="12" CornerRadius="4"/>
 
-                                <Button Grid.Column="2" Content="🚪 Entra nella Stanza" 
+                                <Button Grid.Column="2" Content="Entra nella Stanza" 
                                         Command="{Binding GameBoard.JoinRoomCommand}" 
                                         Background="#684756" Foreground="White" FontWeight="Bold" 
                                         HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="12" CornerRadius="4"/>
@@ -8638,7 +8614,7 @@ public partial class GameViewModel : ObservableObject
                                 <TextBlock Text="{Binding GameBoard.NetworkStatus}" Foreground="#AB8476" FontSize="12" TextAlignment="Center" TextWrapping="Wrap"/>
                             </Border>
 
-                            <Button Content="✕ Annulla" Command="{Binding GameBoard.BackToModeSelectionCommand}" Background="Transparent" Foreground="#AAAABB" HorizontalAlignment="Center"/>
+                            <Button Content="Annulla" Command="{Binding GameBoard.BackToModeSelectionCommand}" Background="Transparent" Foreground="#AAAABB" HorizontalAlignment="Center"/>
                         </StackPanel>
                     </Border>
                 </Grid>
@@ -8647,7 +8623,7 @@ public partial class GameViewModel : ObservableObject
                 <Grid IsVisible="{Binding GameBoard.IsBoardViewVisible}">
                     <Grid ColumnDefinitions="*, 380">
                         
-                        <!-- SCACCHIERA AMPIA CENTRALE (CON CORNER MARKERS) -->
+                        <!-- SCACCHIERA CENTRALE CON CORNER MARKERS -->
                         <Viewbox Grid.Column="0" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center">
                             <Border BorderBrush="#684756" BorderThickness="4" CornerRadius="2">
                                 <ItemsControl ItemsSource="{Binding GameBoard.Squares}">
@@ -8714,7 +8690,7 @@ public partial class GameViewModel : ObservableObject
                             <Grid RowDefinitions="Auto, Auto, Auto, *, Auto">
                                 <Grid Grid.Row="0" ColumnDefinitions="*, Auto" Margin="0,0,0,6">
                                     <TextBlock Grid.Column="0" Text="PARTITA IN CORSO" FontSize="14" FontWeight="Black" Foreground="#AB8476" VerticalAlignment="Center"/>
-                                    <Button Grid.Column="1" Content="✕ Esci" Command="{Binding GameBoard.BackToModeSelectionCommand}" Background="#684756" Foreground="White" FontSize="11" Padding="8,4" CornerRadius="3"/>
+                                    <Button Grid.Column="1" Content="Esci" Command="{Binding GameBoard.BackToModeSelectionCommand}" Background="#684756" Foreground="White" FontSize="11" Padding="8,4" CornerRadius="3"/>
                                 </Grid>
                                 <Separator Grid.Row="1" Background="#684756" Margin="0,0,0,10"/>
                                 
@@ -8812,18 +8788,19 @@ public partial class GameViewModel : ObservableObject
                     <Border Background="#E0101018" IsVisible="{Binding GameBoard.IsVictoryModalActive}" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
                         <Border Background="#3D314A" BorderBrush="#684756" BorderThickness="2" CornerRadius="10" Padding="30" Width="440" HorizontalAlignment="Center" VerticalAlignment="Center">
                             <StackPanel Spacing="16" HorizontalAlignment="Center">
-                                <TextBlock Text="🏆 PARTITA CONCLUSA 🏆" FontSize="14" FontWeight="Bold" Foreground="#AB8476" HorizontalAlignment="Center"/>
+                                <TextBlock Text="PARTITA CONCLUSA" FontSize="14" FontWeight="Bold" Foreground="#AB8476" HorizontalAlignment="Center"/>
                                 <TextBlock Text="{Binding GameBoard.VictoryTitle}" FontSize="24" FontWeight="Black" Foreground="White" TextAlignment="Center" TextWrapping="Wrap"/>
                                 <TextBlock Text="{Binding GameBoard.VictoryMessage}" FontSize="14" Foreground="#FFD500" HorizontalAlignment="Center"/>
                                 <Border Background="#1A1423" CornerRadius="4" Padding="10" Margin="0,5">
                                     <TextBlock Text="{Binding GameBoard.VictoryDeltaScore}" Foreground="White" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center"/>
                                 </Border>
-                                <Button Content="Torna alle Modalità" Command="{Binding GameBoard.BackToModeSelectionCommand}" Background="#96705B" Foreground="White" FontWeight="Bold" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="12" CornerRadius="4"/>
+                                <Button Content="Torna alle Modalita" Command="{Binding GameBoard.BackToModeSelectionCommand}" Background="#96705B" Foreground="White" FontWeight="Bold" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="12" CornerRadius="4"/>
                             </StackPanel>
                         </Border>
                     </Border>
 
-                    <!-- MODALE PROMOZIONE -->
+           
+                   <!-- MODALE PROMOZIONE -->
                     <Border Background="#D0101018" IsVisible="{Binding GameBoard.IsPromotionModalActive}" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
                         <Border Background="#3D314A" BorderBrush="#684756" BorderThickness="2" CornerRadius="8" Padding="20" Width="400" HorizontalAlignment="Center" VerticalAlignment="Center">
                             <StackPanel Spacing="15" HorizontalAlignment="Center">
@@ -8848,10 +8825,10 @@ public partial class GameViewModel : ObservableObject
                                 <TextBox Text="{Binding GameBoard.Player1Name}" Background="#1A1423" Foreground="White" BorderBrush="#684756"/>
                                 <TextBlock Text="Giocatore 2:" Foreground="White" FontSize="12"/>
                                 <TextBox Text="{Binding GameBoard.Player2Name}" Background="#1A1423" Foreground="White" BorderBrush="#684756"/>
-                                <Button Content="🎲 Sorteggia Colori" Command="{Binding GameBoard.DrawColorsCommand}" Background="#96705B" Foreground="White" FontWeight="Bold" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="10" CornerRadius="4"/>
+                                <Button Content="Sorteggia Colori" Command="{Binding GameBoard.DrawColorsCommand}" Background="#96705B" Foreground="White" FontWeight="Bold" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="10" CornerRadius="4"/>
                                 <TextBlock Text="{Binding GameBoard.DrawResultText}" Foreground="#AB8476" FontWeight="SemiBold" TextAlignment="Center" TextWrapping="Wrap"/>
                                 <Button Content="Inizia Partita" Command="{Binding GameBoard.StartMatchCommand}" IsVisible="{Binding GameBoard.CanStartMatch}" Background="#4CAF50" Foreground="White" FontWeight="Bold" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="12" CornerRadius="4"/>
-                                <Button Content="✕ Torna al Menù" Command="{Binding GameBoard.BackToModeSelectionCommand}" Background="Transparent" Foreground="#AAAABB" HorizontalAlignment="Center"/>
+                                <Button Content="Torna al Menu" Command="{Binding GameBoard.BackToModeSelectionCommand}" Background="Transparent" Foreground="#AAAABB" HorizontalAlignment="Center"/>
                             </StackPanel>
                         </Border>
                     </Border>
@@ -8863,7 +8840,7 @@ public partial class GameViewModel : ObservableObject
             <Grid IsVisible="{Binding IsStrategyViewVisible}" Margin="20">
                 <Border Background="#3D314A" CornerRadius="6" Padding="20" BorderBrush="#684756" BorderThickness="1" IsVisible="{Binding !StrategyViewer.IsViewerOpen}">
                     <Grid RowDefinitions="Auto, Auto, *">
-                        <TextBlock Grid.Row="0" Text="STRATEGY &amp; OPENINGS" FontSize="18" FontWeight="Black" Foreground="#AB8476" Margin="0,0,0,8"/>
+                        <TextBlock Grid.Row="0" Text="STRATEGY AND OPENINGS" FontSize="18" FontWeight="Black" Foreground="#AB8476" Margin="0,0,0,8"/>
                         <Separator Grid.Row="1" Background="#684756" Margin="0,0,0,15"/>
                         
                         <Grid Grid.Row="2" ColumnDefinitions="1.2*, *">
@@ -8897,7 +8874,7 @@ public partial class GameViewModel : ObservableObject
                                                     <Border Grid.Column="1" Background="#3D314A" CornerRadius="3" Padding="6,2" Margin="5,0">
                                                         <TextBlock Text="{Binding PlayerColor}" Foreground="#AB8476" FontSize="11" FontWeight="SemiBold"/>
                                                     </Border>
-                                                    <Button Grid.Column="2" Content="👁️ Visualizza" 
+                                                    <Button Grid.Column="2" Content="Visualizza" 
                                                             Command="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).ViewOpeningCommand}"
                                                             CommandParameter="{Binding}"
                                                             Background="#684756" Foreground="White" FontSize="11" Padding="8,4" CornerRadius="3"/>
@@ -8924,7 +8901,7 @@ public partial class GameViewModel : ObservableObject
                                     <TextBlock Text="Inserimento Sequenza Mosse:" Foreground="White" FontSize="11"/>
                                     <Grid ColumnDefinitions="*, Auto">
                                         <TextBox Grid.Column="0" Text="{Binding SingleMoveInput}" Watermark="Es: d4, d5, Nf3..." Background="#3D314A" Foreground="White" BorderBrush="#684756" Margin="0,0,5,0"/>
-                                        <Button Grid.Column="1" Content="➕ Aggiungi" Command="{Binding AddMoveChipCommand}" Background="#684756" Foreground="White" FontWeight="Bold"/>
+                                        <Button Grid.Column="1" Content="Aggiungi" Command="{Binding AddMoveChipCommand}" Background="#684756" Foreground="White" FontWeight="Bold"/>
                                     </Grid>
 
                                     <TextBlock Text="{Binding NextMoveTurnHelp}" Foreground="#AB8476" FontSize="11" FontWeight="SemiBold"/>
@@ -8951,8 +8928,8 @@ public partial class GameViewModel : ObservableObject
                                     <Button Content="Annulla Ultima Mossa" Command="{Binding RemoveLastMoveChipCommand}" Background="#3D314A" Foreground="#AAAABB" HorizontalAlignment="Right" FontSize="11" Padding="8,4"/>
 
                                     <Grid ColumnDefinitions="*, *" Margin="0,8,0,0">
-                                        <Button Grid.Column="0" Content="💾 Salva Strategia" Command="{Binding SaveOpeningCommand}" Background="#96705B" Foreground="White" FontWeight="Bold" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="8" Margin="0,0,4,0"/>
-                                        <Button Grid.Column="1" Content="❌ Elimina" Command="{Binding DeleteOpeningCommand}" IsVisible="{Binding IsEditing}" Background="#684756" Foreground="White" FontWeight="Bold" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="8" Margin="4,0,0,0"/>
+                                        <Button Grid.Column="0" Content="Salva Strategia" Command="{Binding SaveOpeningCommand}" Background="#96705B" Foreground="White" FontWeight="Bold" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="8" Margin="0,0,4,0"/>
+                                        <Button Grid.Column="1" Content="Elimina" Command="{Binding DeleteOpeningCommand}" IsVisible="{Binding IsEditing}" Background="#684756" Foreground="White" FontWeight="Bold" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="8" Margin="4,0,0,0"/>
                                     </Grid>
                                     
                                     <Button Content="Reset Modulo" Command="{Binding CancelEditCommand}" IsVisible="{Binding IsEditing}" Background="Transparent" Foreground="#AAAABB" HorizontalAlignment="Center" FontSize="11"/>
@@ -8971,7 +8948,7 @@ public partial class GameViewModel : ObservableObject
                                 <TextBlock Text="{Binding StrategyViewer.PlayerPerspective, StringFormat='Prospettiva: {0}'}" FontSize="12" Foreground="#AB8476"/>
                             </StackPanel>
 
-                            <Button Grid.Column="1" Content="✕ Torna all'Elenco" Command="{Binding StrategyViewer.CloseViewerCommand}"
+                            <Button Grid.Column="1" Content="Torna all'Elenco" Command="{Binding StrategyViewer.CloseViewerCommand}"
                                     Background="#684756" Foreground="White" FontWeight="Bold" Padding="12,6" CornerRadius="4"/>
                         </Grid>
 
@@ -9002,10 +8979,10 @@ public partial class GameViewModel : ObservableObject
                         <StackPanel Grid.Row="2" HorizontalAlignment="Center" Spacing="8" Margin="0,12,0,0">
                             <TextBlock Text="{Binding StrategyViewer.CurrentMoveText}" Foreground="#AB8476" FontSize="14" FontWeight="Bold" HorizontalAlignment="Center"/>
                             <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center">
-                                <Button Content="|◀ Inizio" Command="{Binding StrategyViewer.FirstMoveCommand}" Background="#1A1423" Foreground="White" Padding="10,6" CornerRadius="4"/>
-                                <Button Content="◀ Indietro" Command="{Binding StrategyViewer.PreviousMoveCommand}" Background="#96705B" Foreground="White" FontWeight="Bold" Padding="12,6" CornerRadius="4"/>
-                                <Button Content="Avanti ▶" Command="{Binding StrategyViewer.NextMoveCommand}" Background="#96705B" Foreground="White" FontWeight="Bold" Padding="12,6" CornerRadius="4"/>
-                                <Button Content="Fine ▶|" Command="{Binding StrategyViewer.LastMoveCommand}" Background="#1A1423" Foreground="White" Padding="10,6" CornerRadius="4"/>
+                                <Button Content="| Inizio" Command="{Binding StrategyViewer.FirstMoveCommand}" Background="#1A1423" Foreground="White" Padding="10,6" CornerRadius="4"/>
+                                <Button Content="Indietro" Command="{Binding StrategyViewer.PreviousMoveCommand}" Background="#96705B" Foreground="White" FontWeight="Bold" Padding="12,6" CornerRadius="4"/>
+                                <Button Content="Avanti" Command="{Binding StrategyViewer.NextMoveCommand}" Background="#96705B" Foreground="White" FontWeight="Bold" Padding="12,6" CornerRadius="4"/>
+                                <Button Content="Fine |" Command="{Binding StrategyViewer.LastMoveCommand}" Background="#1A1423" Foreground="White" Padding="10,6" CornerRadius="4"/>
                             </StackPanel>
                         </StackPanel>
                     </Grid>
@@ -9018,7 +8995,7 @@ public partial class GameViewModel : ObservableObject
                     <Grid RowDefinitions="Auto, Auto, *">
                         <Grid Grid.Row="0" ColumnDefinitions="*, Auto" Margin="0,0,0,8">
                             <TextBlock Grid.Column="0" Text="STORICO PARTITE SALVATE" FontSize="18" FontWeight="Black" Foreground="#AB8476"/>
-                            <Button Grid.Column="1" Content="🔄 Aggiorna" Command="{Binding History.LoadHistoryCommand}" Background="#96705B" Foreground="White" Padding="10,5" CornerRadius="4"/>
+                            <Button Grid.Column="1" Content="Aggiorna" Command="{Binding History.LoadHistoryCommand}" Background="#96705B" Foreground="White" Padding="10,5" CornerRadius="4"/>
                         </Grid>
                         <Separator Grid.Row="1" Background="#684756" Margin="0,0,0,15"/>
 
@@ -9035,7 +9012,7 @@ public partial class GameViewModel : ObservableObject
 
                                                 <TextBlock Grid.Column="1" Text="{Binding FormattedDate}" Foreground="#888888" FontSize="11" VerticalAlignment="Center" Margin="10,0"/>
 
-                                                <Button Grid.Column="2" Content="🗑️" 
+                                                <Button Grid.Column="2" Content="Elimina" 
                                                         Command="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).History.DeleteMatchCommand}"
                                                         CommandParameter="{Binding}"
                                                         Background="#684756" Foreground="White" Padding="6,4" CornerRadius="3"/>
@@ -9088,7 +9065,7 @@ public partial class GameViewModel : ObservableObject
             <Grid IsVisible="{Binding IsProfileViewVisible}" Margin="20">
                 <Border Background="#3D314A" CornerRadius="8" Padding="25" BorderBrush="#684756" BorderThickness="2" MaxWidth="1050" HorizontalAlignment="Center" VerticalAlignment="Center">
                     <Grid RowDefinitions="Auto, Auto, Auto, *">
-                        <TextBlock Grid.Row="0" Text="PROFILO GIOCATORE &amp; RANKING" FontSize="22" FontWeight="Black" Foreground="#AB8476" HorizontalAlignment="Center" Margin="0,0,0,6"/>
+                        <TextBlock Grid.Row="0" Text="PROFILO GIOCATORE AND RANKING" FontSize="22" FontWeight="Black" Foreground="#AB8476" HorizontalAlignment="Center" Margin="0,0,0,6"/>
                         <Separator Grid.Row="1" Background="#684756" Margin="0,0,0,15"/>
 
                         <!-- SEZIONE NICKNAME MODIFICABILE -->
@@ -9096,24 +9073,23 @@ public partial class GameViewModel : ObservableObject
                             <Grid ColumnDefinitions="Auto, *, Auto, Auto" VerticalAlignment="Center">
                                 <TextBlock Grid.Column="0" Text="Nickname:" Foreground="#AB8476" FontWeight="Bold" FontSize="13" VerticalAlignment="Center" Margin="0,0,12,0"/>
                                 <TextBox Grid.Column="1" Text="{Binding ProfileVm.EditableNickname}" Background="#3D314A" Foreground="White" BorderBrush="#684756" FontSize="13" Margin="0,0,12,0"/>
-                                <Button Grid.Column="2" Content="💾 Salva" Command="{Binding ProfileVm.SaveNicknameCommand}" Background="#96705B" Foreground="White" FontWeight="Bold" Padding="12,6" CornerRadius="4"/>
+                                <Button Grid.Column="2" Content="Salva" Command="{Binding ProfileVm.SaveNicknameCommand}" Background="#96705B" Foreground="White" FontWeight="Bold" Padding="12,6" CornerRadius="4"/>
                                 <TextBlock Grid.Column="3" Text="{Binding ProfileVm.SaveFeedback}" Foreground="#4CAF50" FontWeight="Bold" FontSize="12" VerticalAlignment="Center" Margin="12,0,0,0"/>
                             </Grid>
                         </Border>
 
-                        <!-- CARDS METRICHE: CAMPAGNA SOLO | BOT LADDER | ONLINE -->
+                        <!-- CARDS METRICHE: CAMPAGNA | SFIDA BOT | ONLINE -->
                         <Grid Grid.Row="3" ColumnDefinitions="*, 15, *, 15, *">
                             
-                            <!-- 1. CARD CAMPAGNA SOLO (PROGRESSIVA) -->
+                            <!-- 1. CARD CAMPAGNA -->
                             <Border Grid.Column="0" Background="#1A1423" CornerRadius="6" Padding="16" BorderBrush="#684756" BorderThickness="1">
                                 <StackPanel Spacing="10">
-                                    <TextBlock Text="🧗 CAMPAGNA SOLO" FontSize="14" FontWeight="Black" Foreground="#AB8476" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="CAMPAGNA" FontSize="14" FontWeight="Black" Foreground="#AB8476" HorizontalAlignment="Center"/>
                                     <Separator Background="#684756"/>
                                     
                                     <StackPanel HorizontalAlignment="Center" Spacing="1">
                                         <TextBlock Text="ELO CAMPAGNA" FontSize="10" FontWeight="Bold" Foreground="#AAAABB" HorizontalAlignment="Center"/>
                                         <TextBlock Text="{Binding ProfileVm.Profile.EloSoloCampaign}" FontSize="32" FontWeight="Black" Foreground="#FFD500" HorizontalAlignment="Center"/>
-                                        <TextBlock Text="{Binding ProfileVm.Profile.CurrentWinStreak, StringFormat='Streak: {0} 🔥'}" FontSize="11" FontWeight="Bold" Foreground="#FF9800" HorizontalAlignment="Center"/>
                                     </StackPanel>
 
                                     <Grid ColumnDefinitions="*, *" Margin="0,5,0,0">
@@ -9122,7 +9098,6 @@ public partial class GameViewModel : ObservableObject
                                             <TextBlock Text="Vittorie:" Foreground="#4CAF50" FontSize="11" FontWeight="Bold"/>
                                             <TextBlock Text="Patte:" Foreground="#FFD500" FontSize="11" FontWeight="Bold"/>
                                             <TextBlock Text="Sconfitte:" Foreground="#FF5252" FontSize="11" FontWeight="Bold"/>
-                                            <TextBlock Text="Miglior Streak:" Foreground="#FF9800" FontSize="11" FontWeight="Bold"/>
                                             <TextBlock Text="Win Rate:" Foreground="#AB8476" FontSize="11" FontWeight="Bold"/>
                                         </StackPanel>
                                         <StackPanel Grid.Column="1" HorizontalAlignment="Right" Spacing="4">
@@ -9130,22 +9105,21 @@ public partial class GameViewModel : ObservableObject
                                             <TextBlock Text="{Binding ProfileVm.Profile.CampaignWins}" Foreground="#4CAF50" FontSize="11" FontWeight="Bold"/>
                                             <TextBlock Text="{Binding ProfileVm.Profile.CampaignDraws}" Foreground="#FFD500" FontSize="11" FontWeight="Bold"/>
                                             <TextBlock Text="{Binding ProfileVm.Profile.CampaignLosses}" Foreground="#FF5252" FontSize="11" FontWeight="Bold"/>
-                                            <TextBlock Text="{Binding ProfileVm.Profile.BestWinStreak}" Foreground="#FF9800" FontSize="11" FontWeight="Bold"/>
                                             <TextBlock Text="{Binding ProfileVm.Profile.CampaignWinRate, StringFormat='{}{0}%'}" Foreground="#AB8476" FontSize="11" FontWeight="Bold"/>
                                         </StackPanel>
                                     </Grid>
                                 </StackPanel>
                             </Border>
 
-                            <!-- 2. CARD BOT LADDER (TIER FISSO) -->
+                            <!-- 2. CARD SFIDA BOT (LADDER) -->
                             <Border Grid.Column="2" Background="#1A1423" CornerRadius="6" Padding="16" BorderBrush="#684756" BorderThickness="1">
                                 <StackPanel Spacing="10">
-                                    <TextBlock Text="🤖 BOT LADDER" FontSize="14" FontWeight="Black" Foreground="#AB8476" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="SFIDA BOT" FontSize="14" FontWeight="Black" Foreground="#AB8476" HorizontalAlignment="Center"/>
                                     <Separator Background="#684756"/>
                                     
                                     <StackPanel HorizontalAlignment="Center" Spacing="1">
                                         <TextBlock Text="MAX BOT SCONFITTO" FontSize="10" FontWeight="Bold" Foreground="#AAAABB" HorizontalAlignment="Center"/>
-                                        <TextBlock Text="{Binding ProfileVm.Profile.HighestBotDefeatedElo, StringFormat='ELO {0}'}" FontSize="28" FontWeight="Black" Foreground="#4CAF50" HorizontalAlignment="Center"/>
+                                        <TextBlock Text="{Binding ProfileVm.Profile.HighestBotDefeatedDisplay}" FontSize="28" FontWeight="Black" Foreground="#4CAF50" HorizontalAlignment="Center"/>
                                         <TextBlock Text="Tier 200 - 2000" FontSize="11" Foreground="#AAAABB" HorizontalAlignment="Center"/>
                                     </StackPanel>
 
@@ -9171,7 +9145,7 @@ public partial class GameViewModel : ObservableObject
                             <!-- 3. CARD ONLINE ROOMS -->
                             <Border Grid.Column="4" Background="#1A1423" CornerRadius="6" Padding="16" BorderBrush="#684756" BorderThickness="1">
                                 <StackPanel Spacing="10">
-                                    <TextBlock Text="🌐 ONLINE ROOMS" FontSize="14" FontWeight="Black" Foreground="#AB8476" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="ONLINE ROOMS" FontSize="14" FontWeight="Black" Foreground="#AB8476" HorizontalAlignment="Center"/>
                                     <Separator Background="#684756"/>
 
                                     <StackPanel HorizontalAlignment="Center" Spacing="1">

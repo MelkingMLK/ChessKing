@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "buzp5tz8okc=",
+  "dgSpecHash": "S89hhL4zo0g=",
   "success": true,
-  "projectFilePath": "/Users/alessandro/Documents/sFaCioLaTe/Programs/C#/ChessKing/ChessStrategyApp/ChessStrategyApp.csproj",
+  "projectFilePath": "/Users/alessandro/Documents/sFaCioLaTe/Programs/MEDium/ChessKing/ChessStrategyApp/ChessStrategyApp.csproj",
   "expectedPackageFiles": [
     "/Users/alessandro/.nuget/packages/avalonia/11.1.3/avalonia.11.1.3.nupkg.sha512",
     "/Users/alessandro/.nuget/packages/avalonia.angle.windows.natives/2.1.22045.20230930/avalonia.angle.windows.natives.2.1.22045.20230930.nupkg.sha512",
@@ -57,9 +57,9 @@
     "/Users/alessandro/.nuget/packages/system.text.json/10.0.12/system.text.json.10.0.12.nupkg.sha512",
     "/Users/alessandro/.nuget/packages/system.threading.channels/10.0.12/system.threading.channels.10.0.12.nupkg.sha512",
     "/Users/alessandro/.nuget/packages/tmds.dbus.protocol/0.16.0/tmds.dbus.protocol.0.16.0.nupkg.sha512",
+    "/Users/alessandro/.nuget/packages/microsoft.netcore.app.ref/8.0.28/microsoft.netcore.app.ref.8.0.28.nupkg.sha512",
     "/Users/alessandro/.nuget/packages/microsoft.aspnetcore.app.ref/8.0.28/microsoft.aspnetcore.app.ref.8.0.28.nupkg.sha512",
-    "/Users/alessandro/.nuget/packages/microsoft.netcore.app.host.osx-arm64/8.0.28/microsoft.netcore.app.host.osx-arm64.8.0.28.nupkg.sha512",
-    "/Users/alessandro/.nuget/packages/microsoft.netcore.app.ref/8.0.28/microsoft.netcore.app.ref.8.0.28.nupkg.sha512"
+    "/Users/alessandro/.nuget/packages/microsoft.netcore.app.host.osx-arm64/8.0.28/microsoft.netcore.app.host.osx-arm64.8.0.28.nupkg.sha512"
   ],
   "logs": []
 }

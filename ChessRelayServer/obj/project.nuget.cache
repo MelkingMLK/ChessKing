@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "RIVbH29XiuQ=",
+  "dgSpecHash": "AT51WojU5jc=",
   "success": true,
-  "projectFilePath": "/Users/alessandro/Documents/sFaCioLaTe/Programs/C#/ChessKing/ChessRelayServer/ChessRelayServer.csproj",
+  "projectFilePath": "/Users/alessandro/Documents/sFaCioLaTe/Programs/MEDium/ChessKing/ChessRelayServer/ChessRelayServer.csproj",
   "expectedPackageFiles": [
     "/Users/alessandro/.nuget/packages/microsoft.netcore.app.ref/8.0.28/microsoft.netcore.app.ref.8.0.28.nupkg.sha512",
     "/Users/alessandro/.nuget/packages/microsoft.aspnetcore.app.ref/8.0.28/microsoft.aspnetcore.app.ref.8.0.28.nupkg.sha512",

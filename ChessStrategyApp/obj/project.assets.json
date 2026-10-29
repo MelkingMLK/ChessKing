@@ -2567,11 +2567,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "/Users/alessandro/Documents/sFaCioLaTe/Programs/C#/ChessKing/ChessStrategyApp/ChessStrategyApp.csproj",
+      "projectUniqueName": "/Users/alessandro/Documents/sFaCioLaTe/Programs/MEDium/ChessKing/ChessStrategyApp/ChessStrategyApp.csproj",
       "projectName": "ChessStrategyApp",
-      "projectPath": "/Users/alessandro/Documents/sFaCioLaTe/Programs/C#/ChessKing/ChessStrategyApp/ChessStrategyApp.csproj",
+      "projectPath": "/Users/alessandro/Documents/sFaCioLaTe/Programs/MEDium/ChessKing/ChessStrategyApp/ChessStrategyApp.csproj",
       "packagesPath": "/Users/alessandro/.nuget/packages/",
-      "outputPath": "/Users/alessandro/Documents/sFaCioLaTe/Programs/C#/ChessKing/ChessStrategyApp/obj/",
+      "outputPath": "/Users/alessandro/Documents/sFaCioLaTe/Programs/MEDium/ChessKing/ChessStrategyApp/obj/",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "/Users/alessandro/.nuget/NuGet/NuGet.Config"

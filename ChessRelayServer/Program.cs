@@ -4,7 +4,6 @@ using Microsoft.AspNetCore.SignalR;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Porta 5050 esplicita, libera da interferenze di sistema macOS (AirPlay occupa la 5000)
 builder.WebHost.ConfigureKestrel(serverOptions =>
 {
     serverOptions.ListenAnyIP(5050);
@@ -41,7 +40,7 @@ public class ChessHub : Hub
 {
     private static readonly ConcurrentDictionary<string, RoomSession> Rooms = new();
 
-    public async Task CreateRoom(string roomCode, string hostName)
+    public async Task CreateRoom(string roomCode, string hostName, string matchType, string initialFen)
     {
         var code = roomCode.Trim().ToUpperInvariant();
         await Groups.AddToGroupAsync(Context.ConnectionId, code);
@@ -49,7 +48,9 @@ public class ChessHub : Hub
         var session = new RoomSession
         {
             HostConnectionId = Context.ConnectionId,
-            HostName = string.IsNullOrWhiteSpace(hostName) ? "Host" : hostName
+            HostName = string.IsNullOrWhiteSpace(hostName) ? "Host" : hostName,
+            MatchType = string.IsNullOrWhiteSpace(matchType) ? "Standard" : matchType,
+            InitialFen = initialFen ?? string.Empty
         };
 
         Rooms[code] = session;
@@ -75,8 +76,8 @@ public class ChessHub : Hub
         string hostColor = hostIsWhite ? "White" : "Black";
         string guestColor = hostIsWhite ? "Black" : "White";
 
-        await Clients.Client(session.HostConnectionId).SendAsync("GameStarted", hostColor, session.GuestName);
-        await Clients.Client(session.GuestConnectionId).SendAsync("GameStarted", guestColor, session.HostName);
+        await Clients.Client(session.HostConnectionId).SendAsync("GameStarted", hostColor, session.GuestName, session.MatchType, session.InitialFen);
+        await Clients.Client(session.GuestConnectionId).SendAsync("GameStarted", guestColor, session.HostName, session.MatchType, session.InitialFen);
     }
 
     public async Task SendMove(string roomCode, string moveData)
@@ -106,4 +107,6 @@ public class RoomSession
     public string HostName { get; set; } = string.Empty;
     public string GuestConnectionId { get; set; } = string.Empty;
     public string GuestName { get; set; } = string.Empty;
+    public string MatchType { get; set; } = "Standard";
+    public string InitialFen { get; set; } = string.Empty;
 }

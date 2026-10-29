@@ -36,11 +36,14 @@ public partial class MainWindowViewModel : ObservableObject
     public bool IsHistoryViewVisible => CurrentView == "History";
     public bool IsProfileViewVisible => CurrentView == "Profile";
 
-    // --- SELEZIONE BOT LADDER DINAMICA ---
-    [ObservableProperty]
-    private int _selectedLadderElo = 200;
+    // --- MODALITÀ SANDBOX ---
+    public ObservableCollection<string> SandboxModes { get; } = new()
+    {
+        "BGC (Blind Gambling Chess)"
+    };
 
-    public ObservableCollection<int> AvailableLadderTiers { get; } = new() { 200 };
+    [ObservableProperty]
+    private string _selectedSandboxMode = "BGC (Blind Gambling Chess)";
 
     // --- SEZIONE STRATEGY (CATALOGO APERTURE CON ALBERO MOVENODE) ---
     public ObservableCollection<string> StrategyTypes { get; } = new() { "Opening" };
@@ -140,35 +143,13 @@ public partial class MainWindowViewModel : ObservableObject
     {
         ProfileVm = new ProfileViewModel(_profileService);
 
-        // Notifica match terminato per aggiornamento ELO o sblocco del Tier successivo
-        GameBoard.OnBotMatchConcluded += async (soloType, outcome, botElo) =>
-        {
-            if (soloType == GameViewModel.SoloType.Campaign)
-            {
-                await ProfileVm.RegisterCampaignResultAsync(outcome, botElo);
-            }
-            else if (soloType == GameViewModel.SoloType.BotLadder)
-            {
-                await ProfileVm.RegisterBotLadderResultAsync(outcome, botElo);
-                Dispatcher.UIThread.Post(() =>
-                {
-                    RefreshAvailableTiers();
-                    // Preseleziona il nuovo livello sbloccato in caso di vittoria
-                    if (outcome == 1.0 && AvailableLadderTiers.Count > 0)
-                    {
-                        SelectedLadderElo = AvailableLadderTiers.Last();
-                    }
-                });
-            }
-        };
-
         _database = Task.Run(async () => await _strategyService.LoadStrategiesAsync()).Result;
         ApplyFilters();
 
-        _ = InitializeProfileAndLadderAsync();
+        _ = InitializeProfileAsync();
     }
 
-    private async Task InitializeProfileAndLadderAsync()
+    private async Task InitializeProfileAsync()
     {
         await ProfileVm.InitializeAsync();
         Dispatcher.UIThread.Post(() =>
@@ -177,58 +158,13 @@ public partial class MainWindowViewModel : ObservableObject
             {
                 GameBoard.Nickname = ProfileVm.Profile.Nickname;
             }
-
-            // Popola i tier leggendo lo stato salvato nel file JSON
-            RefreshAvailableTiers();
-
-            // All'avvio dell'applicazione preseleziona l'ultimo tier attualmente sbloccato
-            if (AvailableLadderTiers.Count > 0)
-            {
-                SelectedLadderElo = AvailableLadderTiers.Last();
-            }
         });
     }
 
-    public void RefreshAvailableTiers()
-    {
-        int maxDefeated = ProfileVm.Profile.HighestBotDefeatedElo;
-        int maxUnlockable = Math.Max(200, Math.Min(2000, maxDefeated + 200));
-
-        var validTiers = new List<int>();
-        for (int tier = 200; tier <= maxUnlockable; tier += 200)
-        {
-            validTiers.Add(tier);
-        }
-
-        if (!AvailableLadderTiers.SequenceEqual(validTiers))
-        {
-            AvailableLadderTiers.Clear();
-            foreach (var tier in validTiers)
-            {
-                AvailableLadderTiers.Add(tier);
-            }
-        }
-
-        // Se il valore selezionato non rientra piu tra quelli ammessi, fallback sul primo valido
-        if (!AvailableLadderTiers.Contains(SelectedLadderElo))
-        {
-            SelectedLadderElo = AvailableLadderTiers.FirstOrDefault();
-        }
-
-        OnPropertyChanged(nameof(SelectedLadderElo));
-        OnPropertyChanged(nameof(AvailableLadderTiers));
-    }
-
     [RelayCommand]
-    private void LaunchCampaign()
+    private void LaunchSandbox()
     {
-        GameBoard.StartCampaignMatch(ProfileVm.Profile.EloSoloCampaign);
-    }
-
-    [RelayCommand]
-    private void LaunchBotLadder()
-    {
-        GameBoard.StartBotLadderMatch(SelectedLadderElo);
+        GameBoard.StartSandboxMatch(SelectedSandboxMode);
     }
 
     [RelayCommand]
@@ -249,7 +185,6 @@ public partial class MainWindowViewModel : ObservableObject
         else if (viewName == "Profile")
         {
             await ProfileVm.InitializeAsync();
-            RefreshAvailableTiers();
         }
         else if (viewName == "Play")
         {
@@ -257,7 +192,6 @@ public partial class MainWindowViewModel : ObservableObject
             {
                 GameBoard.Nickname = ProfileVm.Profile.Nickname;
             }
-            RefreshAvailableTiers();
         }
     }
 

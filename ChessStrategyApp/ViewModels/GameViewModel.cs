@@ -14,13 +14,12 @@ namespace ChessStrategyApp.ViewModels;
 
 public partial class GameViewModel : ObservableObject
 {
-    public enum GameMode { None, Local, P2P, Solo }
-    public enum SoloType { None, Campaign, BotLadder }
+    public enum GameMode { None, Local, P2P, Sandbox }
+    public enum SandboxType { None, BGC }
 
     private readonly GameEngineService _engine = new();
     private readonly MatchHistoryService _historyService = new();
     private readonly SignalRClientService _network = new();
-    private readonly BotEngineService _botService = new();
     private readonly Random _random = new();
 
     private ChessSquare? _selectedSquare;
@@ -32,14 +31,14 @@ public partial class GameViewModel : ObservableObject
 
     public ObservableCollection<ChessSquare> Squares { get; } = new();
 
-    // --- STORICO MOSSE SEPARATO (BIANCO E NERO) ---
+    // --- STORICO MOSSE SEPARATO IN NOTAZIONE SAN ---
     public ObservableCollection<string> WhiteMovesHistory { get; } = new();
     public ObservableCollection<string> BlackMovesHistory { get; } = new();
 
-    // --- TRACCIAMENTO ULTIMA MOSSA (CORNER MARKERS) ---
+    // --- TRACCIAMENTO ULTIMA MOSSA ---
     private (int FromFile, int FromRank, int ToFile, int ToRank)? _lastMoveCoordinates;
 
-    // --- STATI DELLA MODALITÀ E NAVIGAZIONE ---
+    // --- MODALITÀ ATTIVA ---
     private GameMode _currentGameMode = GameMode.None;
     public GameMode CurrentGameMode
     {
@@ -50,22 +49,34 @@ public partial class GameViewModel : ObservableObject
             {
                 OnPropertyChanged(nameof(IsModeSelectionVisible));
                 OnPropertyChanged(nameof(IsBoardViewVisible));
+                OnPropertyChanged(nameof(IsBgcActive));
             }
         }
     }
 
     [ObservableProperty]
-    private SoloType _activeSoloType = SoloType.None;
+    [NotifyPropertyChangedFor(nameof(IsBgcActive))]
+    private SandboxType _activeSandboxType = SandboxType.None;
 
+    // Modalità stanza online
     [ObservableProperty]
-    private int _currentBotElo = 200;
+    [NotifyPropertyChangedFor(nameof(IsBgcActive))]
+    [NotifyPropertyChangedFor(nameof(IsOnlineStandardSelected))]
+    [NotifyPropertyChangedFor(nameof(IsOnlineBgcSelected))]
+    private string _selectedOnlineMatchType = "Standard";
 
-    public event Action<SoloType, double, int>? OnBotMatchConcluded;
+    public bool IsOnlineStandardSelected => SelectedOnlineMatchType == "Standard";
+    public bool IsOnlineBgcSelected => SelectedOnlineMatchType.StartsWith("BGC");
+
+    // BGC attivo sia se avviato da Sandbox sia se selezionato nella Online Room
+    public bool IsBgcActive => 
+        (CurrentGameMode == GameMode.Sandbox && ActiveSandboxType == SandboxType.BGC) ||
+        (CurrentGameMode == GameMode.P2P && SelectedOnlineMatchType.StartsWith("BGC"));
 
     public bool IsModeSelectionVisible => CurrentGameMode == GameMode.None;
-    public bool IsBoardViewVisible => CurrentGameMode == GameMode.Local || CurrentGameMode == GameMode.Solo || (CurrentGameMode == GameMode.P2P && IsP2PGameActive);
+    public bool IsBoardViewVisible => CurrentGameMode == GameMode.Local || CurrentGameMode == GameMode.Sandbox || (CurrentGameMode == GameMode.P2P && IsP2PGameActive);
 
-    // --- STATI ONLINE ROOMS (SIGNALR) ---
+    // --- STATI ONLINE ROOMS ---
     private bool _isP2PConfigVisible = false;
     public bool IsP2PConfigVisible
     {
@@ -123,7 +134,6 @@ public partial class GameViewModel : ObservableObject
 
     private Player _localAssignedPlayer = Player.White;
 
-    // --- PROIEZIONE GRAFICA / BOARD FLIPPING ---
     private bool IsBoardFlipped => CurrentGameMode == GameMode.P2P && _localAssignedPlayer == Player.Black;
 
     private (int file, int rank) DisplayToChessCoords(int displayRow, int displayCol)
@@ -164,7 +174,7 @@ public partial class GameViewModel : ObservableObject
     [ObservableProperty]
     private bool _isWhiteActive = true;
 
-    // --- MATERIALE CATTURATO (FIFO MAX 4 + BADGE OVERFLOW) ---
+    // --- MATERIALE CATTURATO ---
     public ObservableCollection<string> DisplayedWhiteCaptured { get; } = new();
     public ObservableCollection<string> DisplayedBlackCaptured { get; } = new();
 
@@ -237,40 +247,38 @@ public partial class GameViewModel : ObservableObject
 
         _engine.OnMoveExecuted += () => Dispatcher.UIThread.Post(RefreshBoardFromEngine);
 
-        _network.OnConnected += () => Dispatcher.UIThread.Post(() =>
-        {
-            NetworkStatus = "Connesso al server...";
-        });
-
+        _network.OnConnected += () => Dispatcher.UIThread.Post(() => NetworkStatus = "Connesso al server...");
         _network.OnRoomCreated += (code) => Dispatcher.UIThread.Post(() =>
         {
             IsConnecting = false;
             NetworkStatus = $"Stanza [{code}] creata! In attesa che l'avversario entri...";
         });
-
         _network.OnJoinFailed += (err) => Dispatcher.UIThread.Post(() =>
         {
             IsConnecting = false;
             NetworkStatus = $"Errore di accesso: {err}";
         });
 
-        _network.OnGameStarted += (assignedColor, opponentName) => Dispatcher.UIThread.Post(() =>
+        _network.OnGameStarted += (assignedColor, opponentName, matchType, fen) => Dispatcher.UIThread.Post(() =>
         {
             IsConnecting = false;
             bool amIWhite = assignedColor.Equals("White", StringComparison.OrdinalIgnoreCase);
             _localAssignedPlayer = amIWhite ? Player.White : Player.Black;
 
+            SelectedOnlineMatchType = matchType;
+            OnPropertyChanged(nameof(IsBgcActive));
+
             if (amIWhite)
             {
                 WhitePlayerName = string.IsNullOrWhiteSpace(Nickname) ? "Tu" : Nickname.Trim();
                 BlackPlayerName = opponentName;
-                NetworkStatus = $"Sorteggio: Sei il Bianco. Avversario: {opponentName}";
+                NetworkStatus = $"Sorteggio: Sei il Bianco. Avversario: {opponentName} [{matchType}]";
             }
             else
             {
                 WhitePlayerName = opponentName;
                 BlackPlayerName = string.IsNullOrWhiteSpace(Nickname) ? "Tu" : Nickname.Trim();
-                NetworkStatus = $"Sorteggio: Sei il Nero. Avversario: {opponentName}";
+                NetworkStatus = $"Sorteggio: Sei il Nero. Avversario: {opponentName} [{matchType}]";
             }
 
             IsP2PConfigVisible = false;
@@ -283,7 +291,16 @@ public partial class GameViewModel : ObservableObject
             BlackMovesHistory.Clear();
             _lastMoveCoordinates = null;
             _matchSaved = false;
-            _engine.ResetGame();
+
+            if (!string.IsNullOrWhiteSpace(fen))
+            {
+                _engine.LoadCustomFen(fen);
+            }
+            else
+            {
+                _engine.ResetGame();
+            }
+
             RefreshBoardFromEngine();
         });
 
@@ -295,11 +312,11 @@ public partial class GameViewModel : ObservableObject
             if (coords.Length == 2)
             {
                 char promo = parts.Length > 1 && parts[1].Length > 0 ? parts[1][0] : ' ';
-                bool success = promo != ' ' ? _engine.TryMove(coords[0], coords[1], promo) : _engine.TryMove(coords[0], coords[1]);
+                bool success = _engine.TryMoveWithSan(coords[0], coords[1], promo, out string san);
                 if (success)
                 {
-                    _moves.Add(movePayload);
-                    RecordMoveInHistory(coords[0], coords[1], isWhiteTurn: _engine.Turn != Player.White);
+                    _moves.Add(san);
+                    RecordMoveInHistory(coords[0], coords[1], san, isWhiteTurn: _engine.Turn != Player.White);
                     RefreshBoardFromEngine();
                 }
             }
@@ -319,6 +336,12 @@ public partial class GameViewModel : ObservableObject
 
         InitializeEmptyBoard();
         RefreshBoardFromEngine();
+    }
+
+    [RelayCommand]
+    private void SetOnlineMatchType(string type)
+    {
+        SelectedOnlineMatchType = type;
     }
 
     private void InitializeEmptyBoard()
@@ -341,6 +364,12 @@ public partial class GameViewModel : ObservableObject
 
     public void RefreshBoardFromEngine()
     {
+        Player myPerspective = _localAssignedPlayer;
+        if (CurrentGameMode == GameMode.Local || CurrentGameMode == GameMode.Sandbox)
+        {
+            myPerspective = _engine.Turn;
+        }
+
         for (int r = 0; r < 8; r++)
         {
             for (int c = 0; c < 8; c++)
@@ -349,15 +378,21 @@ public partial class GameViewModel : ObservableObject
                 var piece = _engine.GetPieceAt(chessFile, chessRank);
                 int index = r * 8 + c;
 
+                // Coordinate a bordo casella
+                Squares[index].RankCoordinate = (c == 0) ? chessRank.ToString() : string.Empty;
+                Squares[index].FileCoordinate = (r == 7) ? ((char)('a' + chessFile)).ToString() : string.Empty;
+
                 if (piece != null)
                 {
                     Squares[index].Piece = piece.GetFenCharacter().ToString().ToUpperInvariant();
                     Squares[index].PieceColor = piece.Owner == Player.White ? "White" : "Black";
+                    Squares[index].IsObscured = IsBgcActive && (piece.Owner != myPerspective);
                 }
                 else
                 {
                     Squares[index].Piece = string.Empty;
                     Squares[index].PieceColor = string.Empty;
+                    Squares[index].IsObscured = false;
                 }
             }
         }
@@ -386,23 +421,35 @@ public partial class GameViewModel : ObservableObject
             }
         }
 
-        var (whiteCaps, blackCaps, advantage) = _engine.GetCapturedPiecesAndScore();
-        UpdateCapturedLists(whiteCaps, blackCaps);
+        if (!IsBgcActive)
+        {
+            var (whiteCaps, blackCaps, advantage) = _engine.GetCapturedPiecesAndScore();
+            UpdateCapturedLists(whiteCaps, blackCaps);
 
-        if (advantage > 0)
-        {
-            WhiteScoreDelta = $"+{advantage}";
-            BlackScoreDelta = string.Empty;
-        }
-        else if (advantage < 0)
-        {
-            WhiteScoreDelta = string.Empty;
-            BlackScoreDelta = $"+{Math.Abs(advantage)}";
+            if (advantage > 0)
+            {
+                WhiteScoreDelta = $"+{advantage}";
+                BlackScoreDelta = string.Empty;
+            }
+            else if (advantage < 0)
+            {
+                WhiteScoreDelta = string.Empty;
+                BlackScoreDelta = $"+{Math.Abs(advantage)}";
+            }
+            else
+            {
+                WhiteScoreDelta = string.Empty;
+                BlackScoreDelta = string.Empty;
+            }
         }
         else
         {
+            DisplayedWhiteCaptured.Clear();
+            DisplayedBlackCaptured.Clear();
             WhiteScoreDelta = string.Empty;
             BlackScoreDelta = string.Empty;
+            HasWhiteOverflow = false;
+            HasBlackOverflow = false;
         }
 
         foreach (var sq in Squares)
@@ -472,9 +519,11 @@ public partial class GameViewModel : ObservableObject
         BlackCapturedOverflowBadge = bOver > 0 ? $"+{bOver}" : string.Empty;
     }
 
-    private void RecordMoveInHistory(string from, string to, bool isWhiteTurn)
+    private void RecordMoveInHistory(string from, string to, string san, bool isWhiteTurn)
     {
-        string record = $"{from} -> {to}";
+        int moveNumber = (WhiteMovesHistory.Count + BlackMovesHistory.Count) / 2 + 1;
+        string record = isWhiteTurn ? $"{moveNumber}. {san}" : $"{moveNumber}... {san}";
+
         if (isWhiteTurn)
             WhiteMovesHistory.Add(record);
         else
@@ -527,33 +576,15 @@ public partial class GameViewModel : ObservableObject
         }
     }
 
-    // --- GESTIONE BOT (METODI UNICI SENZA DUPLICATI) ---
-    public void StartCampaignMatch(int playerElo)
+    // --- MODALITÀ SANDBOX & BGC ---
+    public void StartSandboxMatch(string variantName)
     {
-        CurrentGameMode = GameMode.Solo;
-        ActiveSoloType = SoloType.Campaign;
-        CurrentBotElo = playerElo;
+        CurrentGameMode = GameMode.Sandbox;
+        ActiveSandboxType = SandboxType.BGC;
 
-        WhitePlayerName = string.IsNullOrWhiteSpace(Nickname) ? "Tu" : Nickname.Trim();
-        BlackPlayerName = $"Bot Campagna ({CurrentBotElo})";
+        WhitePlayerName = string.IsNullOrWhiteSpace(Nickname) ? "Giocatore 1" : Nickname.Trim();
+        BlackPlayerName = "Giocatore 2 (BGC)";
 
-        StartSoloGame();
-    }
-
-    public void StartBotLadderMatch(int selectedElo)
-    {
-        CurrentGameMode = GameMode.Solo;
-        ActiveSoloType = SoloType.BotLadder;
-        CurrentBotElo = selectedElo;
-
-        WhitePlayerName = string.IsNullOrWhiteSpace(Nickname) ? "Tu" : Nickname.Trim();
-        BlackPlayerName = $"Bot Sfida Tier {CurrentBotElo}";
-
-        StartSoloGame();
-    }
-
-    private void StartSoloGame()
-    {
         IsP2PConfigVisible = false;
         IsP2PGameActive = false;
         IsSetupModalActive = false;
@@ -563,8 +594,20 @@ public partial class GameViewModel : ObservableObject
         BlackMovesHistory.Clear();
         _lastMoveCoordinates = null;
         _matchSaved = false;
+
         _engine.ResetGame();
         RefreshBoardFromEngine();
+    }
+
+    [RelayCommand]
+    private void ShuffleBoard()
+    {
+        if (IsBgcActive && _moves.Count == 0)
+        {
+            _engine.ShuffleInitialSetup();
+            RefreshBoardFromEngine();
+            StatusMessage = "Scacchiera BGC mescolata! Re al sicuro sulla prima traversa.";
+        }
     }
 
     // --- SELEZIONE MODALITÀ ---
@@ -572,7 +615,7 @@ public partial class GameViewModel : ObservableObject
     private void SelectLocalMode()
     {
         CurrentGameMode = GameMode.Local;
-        ActiveSoloType = SoloType.None;
+        ActiveSandboxType = SandboxType.None;
         IsP2PConfigVisible = false;
         IsP2PGameActive = false;
         IsSetupModalActive = true;
@@ -582,7 +625,7 @@ public partial class GameViewModel : ObservableObject
     private void SelectP2PMode()
     {
         CurrentGameMode = GameMode.P2P;
-        ActiveSoloType = SoloType.None;
+        ActiveSandboxType = SandboxType.None;
         IsP2PConfigVisible = true;
         IsP2PGameActive = false;
         IsSetupModalActive = false;
@@ -594,7 +637,7 @@ public partial class GameViewModel : ObservableObject
     {
         await _network.DisconnectAsync();
         CurrentGameMode = GameMode.None;
-        ActiveSoloType = SoloType.None;
+        ActiveSandboxType = SandboxType.None;
         IsP2PConfigVisible = false;
         IsP2PGameActive = false;
         IsVictoryModalActive = false;
@@ -620,8 +663,22 @@ public partial class GameViewModel : ObservableObject
         }
 
         IsConnecting = true;
-        NetworkStatus = $"Creazione stanza [{RoomCode.Trim().ToUpperInvariant()}] in corso...";
-        await _network.CreateRoomAsync(ServerUrl.Trim(), RoomCode.Trim().ToUpperInvariant(), Nickname.Trim());
+        NetworkStatus = $"Creazione stanza [{RoomCode.Trim().ToUpperInvariant()}] ({SelectedOnlineMatchType})...";
+
+        string initialFen = string.Empty;
+        if (SelectedOnlineMatchType.StartsWith("BGC"))
+        {
+            _engine.ShuffleInitialSetup();
+            initialFen = _engine.RawGameInstance.GetFen();
+        }
+
+        await _network.CreateRoomAsync(
+            ServerUrl.Trim(), 
+            RoomCode.Trim().ToUpperInvariant(), 
+            Nickname.Trim(), 
+            SelectedOnlineMatchType, 
+            initialFen
+        );
     }
 
     [RelayCommand]
@@ -692,20 +749,15 @@ public partial class GameViewModel : ObservableObject
             }
 
             bool wasWhite = _engine.Turn == Player.White;
-            bool success = _engine.TryMove(from, to);
+            bool success = _engine.TryMoveWithSan(from, to, ' ', out string sanNotation);
             if (success)
             {
-                string moveRecord = $"{from}-{to}";
-                _moves.Add(moveRecord);
-                RecordMoveInHistory(from, to, isWhiteTurn: wasWhite);
+                _moves.Add(sanNotation);
+                RecordMoveInHistory(from, to, sanNotation, isWhiteTurn: wasWhite);
 
                 if (CurrentGameMode == GameMode.P2P)
                 {
-                    _ = _network.SendMoveAsync(RoomCode.Trim().ToUpperInvariant(), moveRecord);
-                }
-                else if (CurrentGameMode == GameMode.Solo && !_engine.IsGameOver)
-                {
-                    TriggerCpuReply();
+                    _ = _network.SendMoveAsync(RoomCode.Trim().ToUpperInvariant(), $"{from}-{to}");
                 }
             }
 
@@ -737,16 +789,15 @@ public partial class GameViewModel : ObservableObject
         char promo = pieceCode.ToUpperInvariant()[0];
         string toSquare = _pendingToSquare;
         bool wasWhite = _engine.Turn == Player.White;
-        bool success = _engine.TryMove(_pendingFromSquare, toSquare, promo);
+        bool success = _engine.TryMoveWithSan(_pendingFromSquare, toSquare, promo, out string sanNotation);
         if (success)
         {
-            string moveRecord = $"{_pendingFromSquare}-{toSquare}={promo}";
-            _moves.Add(moveRecord);
-            RecordMoveInHistory(_pendingFromSquare, toSquare, isWhiteTurn: wasWhite);
+            _moves.Add(sanNotation);
+            RecordMoveInHistory(_pendingFromSquare, toSquare, sanNotation, isWhiteTurn: wasWhite);
 
             if (CurrentGameMode == GameMode.P2P)
             {
-                _ = _network.SendMoveAsync(RoomCode.Trim().ToUpperInvariant(), moveRecord);
+                _ = _network.SendMoveAsync(RoomCode.Trim().ToUpperInvariant(), $"{_pendingFromSquare}-{toSquare}={promo}");
             }
 
             if (toSquare.Length == 2)
@@ -760,45 +811,11 @@ public partial class GameViewModel : ObservableObject
                     Squares[idx].IsPromoted = true;
                 }
             }
-
-            if (CurrentGameMode == GameMode.Solo && !_engine.IsGameOver)
-            {
-                TriggerCpuReply();
-            }
         }
 
         IsPromotionModalActive = false;
         _pendingFromSquare = string.Empty;
         _pendingToSquare = string.Empty;
-    }
-
-    private void TriggerCpuReply()
-    {
-        Task.Delay(350).ContinueWith(async _ =>
-        {
-            if (_engine.Turn == Player.Black && !_engine.IsGameOver)
-            {
-                var bestMove = await _botService.PickBestMoveAsync(_engine.RawGameInstance, CurrentBotElo);
-                if (bestMove != null)
-                {
-                    Dispatcher.UIThread.Post(() =>
-                    {
-                        string from = $"{(char)('a' + (int)bestMove.OriginalPosition.File)}{bestMove.OriginalPosition.Rank}";
-                        string to = $"{(char)('a' + (int)bestMove.NewPosition.File)}{bestMove.NewPosition.Rank}";
-                        char promo = bestMove.Promotion.HasValue ? bestMove.Promotion.Value : ' ';
-
-                        bool success = promo != ' ' ? _engine.TryMove(from, to, promo) : _engine.TryMove(from, to);
-                        if (success)
-                        {
-                            string moveRecord = promo != ' ' ? $"{from}-{to}={promo}" : $"{from}-{to}";
-                            _moves.Add(moveRecord);
-                            RecordMoveInHistory(from, to, isWhiteTurn: false);
-                            RefreshBoardFromEngine();
-                        }
-                    });
-                }
-            }
-        });
     }
 
     private string GetCoord(ChessSquare sq)
@@ -882,24 +899,8 @@ public partial class GameViewModel : ObservableObject
             VictoryMessage = $"Esito: {reason}";
         }
 
-        VictoryDeltaScore = $"Differenza Materiale: {deltaString}";
+        VictoryDeltaScore = IsBgcActive ? "Modalita BGC: Materiale non rivelato" : $"Differenza Materiale: {deltaString}";
         IsVictoryModalActive = true;
-
-        // DETERMINAZIONE OGGETTIVA DELL'ESITO PER IL BOT
-        if (CurrentGameMode == GameMode.Solo && ActiveSoloType != SoloType.None)
-        {
-            double outcome = 0.0;
-            if (winner == "Patta")
-            {
-                outcome = 0.5;
-            }
-            else if (winner.Equals(WhitePlayerName, StringComparison.OrdinalIgnoreCase))
-            {
-                outcome = 1.0;
-            }
-
-            OnBotMatchConcluded?.Invoke(ActiveSoloType, outcome, CurrentBotElo);
-        }
 
         var item = new MatchHistoryItem
         {
