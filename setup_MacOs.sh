@@ -1,50 +1,23 @@
-## --- Compilazione e Output .NET / MSBuild ---
-[Bb]in/
-[Oo]bj/
-[Oo]ut/
-*.runtimeconfig.json
-*.runtimeconfig.dev.json
-*.deps.json
-*.dll
-*.pdb
-*.exe
+#!/bin/bash
+set -e
 
-## --- Dati locali di test, Cache e Repomix ---
-matches.json
-user_profile.json
-strategies.json
-repomix-output*.xml
-fix.md
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-## --- Visual Studio & VS Code ---
-.vscode/
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
-.vs/
-*.user
-*.userprefs
-*.suo
-*.sln.docstates
+echo "=== [ChessKing] Verifica Ambiente macOS ==="
 
-## --- File di sistema macOS ---
-.DS_Store
-.AppleDouble
-.LSOverride
-._*
-.Spotlight-V100
-.Trashes
+if [[ -f "/opt/homebrew/bin/brew" ]]; then
+    eval "$(/opt/homebrew/bin/brew shellenv)"
+elif [[ -f "/usr/local/bin/brew" ]]; then
+    eval "$(/usr/local/bin/brew shellenv)"
+fi
 
-## --- File di sistema Windows ---
-Thumbs.db
-ehthumbs.db
-Desktop.ini
+export PATH="$PATH:/usr/local/share/dotnet:~/.dotnet"
 
-## --- Rider / JetBrains ---
-.idea/
-*.sln.iml
+if ! command -v dotnet &> /dev/null; then
+    echo "Installazione .NET SDK in corso..."
+    brew install --cask dotnet-sdk
+    export PATH="$PATH:/usr/local/share/dotnet:~/.dotnet"
+fi
 
-## --- Log e Crash Dumps ---
-*.log
-*.dmp
+echo "Ripristino dipendenze e avvio ChessKing..."
+dotnet run --project "$REPO_ROOT/ChessStrategyApp/ChessStrategyApp.csproj"
