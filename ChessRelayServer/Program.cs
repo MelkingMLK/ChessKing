@@ -40,7 +40,7 @@ public class ChessHub : Hub
 {
     private static readonly ConcurrentDictionary<string, RoomSession> Rooms = new();
 
-    public async Task CreateRoom(string roomCode, string hostName, string matchType, string initialFen)
+    public async Task CreateRoom(string roomCode, string hostName, string matchType, string initialBoardState)
     {
         var code = roomCode.Trim().ToUpperInvariant();
         await Groups.AddToGroupAsync(Context.ConnectionId, code);
@@ -50,7 +50,7 @@ public class ChessHub : Hub
             HostConnectionId = Context.ConnectionId,
             HostName = string.IsNullOrWhiteSpace(hostName) ? "Host" : hostName,
             MatchType = string.IsNullOrWhiteSpace(matchType) ? "Standard" : matchType,
-            InitialFen = initialFen ?? string.Empty
+            InitialBoardState = initialBoardState ?? string.Empty
         };
 
         Rooms[code] = session;
@@ -71,19 +71,28 @@ public class ChessHub : Hub
         session.GuestConnectionId = Context.ConnectionId;
         session.GuestName = string.IsNullOrWhiteSpace(guestName) ? "Ospite" : guestName;
 
-        // Sorteggio casuale 50/50
         bool hostIsWhite = RandomNumberGenerator.GetInt32(2) == 0;
         string hostColor = hostIsWhite ? "White" : "Black";
         string guestColor = hostIsWhite ? "Black" : "White";
 
-        await Clients.Client(session.HostConnectionId).SendAsync("GameStarted", hostColor, session.GuestName, session.MatchType, session.InitialFen);
-        await Clients.Client(session.GuestConnectionId).SendAsync("GameStarted", guestColor, session.HostName, session.MatchType, session.InitialFen);
+        await Clients.Client(session.HostConnectionId).SendAsync("GameStarted", hostColor, session.GuestName, session.MatchType, session.InitialBoardState);
+        await Clients.Client(session.GuestConnectionId).SendAsync("GameStarted", guestColor, session.HostName, session.MatchType, session.InitialBoardState);
     }
 
     public async Task SendMove(string roomCode, string moveData)
     {
         var code = roomCode.Trim().ToUpperInvariant();
         await Clients.OthersInGroup(code).SendAsync("ReceiveMove", moveData);
+    }
+
+    public async Task SyncBoard(string roomCode, string boardState)
+    {
+        var code = roomCode.Trim().ToUpperInvariant();
+        if (Rooms.TryGetValue(code, out var session))
+        {
+            session.InitialBoardState = boardState;
+        }
+        await Clients.OthersInGroup(code).SendAsync("ReceiveBoardSync", boardState);
     }
 
     public override async Task OnDisconnectedAsync(Exception? exception)
@@ -108,5 +117,5 @@ public class RoomSession
     public string GuestConnectionId { get; set; } = string.Empty;
     public string GuestName { get; set; } = string.Empty;
     public string MatchType { get; set; } = "Standard";
-    public string InitialFen { get; set; } = string.Empty;
+    public string InitialBoardState { get; set; } = string.Empty;
 }

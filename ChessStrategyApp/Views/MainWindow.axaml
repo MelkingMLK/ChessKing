@@ -414,9 +414,10 @@
                                     <TextBlock Text="{Binding GameBoard.StatusMessage}" Foreground="#AAAABB" FontSize="11" TextAlignment="Center" TextWrapping="Wrap"/>
                                     
                                     <!-- Pulsante Shuffle per BGC prima dell'avvio mosse -->
+                                  <!-- Pulsante Shuffle visibile SOLO prima della primissima mossa -->
                                     <Button Content="Shuffle Schieramento BGC" 
                                             Command="{Binding GameBoard.ShuffleBoardCommand}" 
-                                            IsVisible="{Binding GameBoard.IsBgcActive}"
+                                            IsVisible="{Binding GameBoard.CanShuffleBoard}"
                                             Background="#684756" Foreground="White" FontWeight="Bold" 
                                             HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="8" CornerRadius="4"/>
 

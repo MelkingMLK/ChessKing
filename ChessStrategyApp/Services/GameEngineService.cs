@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Security.Cryptography;
+using System.Text;
 using Avalonia.Threading;
 using ChessDotNet;
 using ChessDotNet.Pieces;
@@ -82,18 +83,13 @@ public class GameEngineService
 
     public void ShuffleInitialSetup()
     {
-        ResetGame();
-
         var board = new Piece[8][];
         for (int r = 0; r < 8; r++)
         {
             board[r] = new Piece[8];
         }
 
-        // Setup fazione Bianca (righe 7 e 6)
         PlaceShuffledFaction(board, Player.White, backRank: 7, frontRank: 6);
-
-        // Setup fazione Nera (righe 0 e 1)
         PlaceShuffledFaction(board, Player.Black, backRank: 0, frontRank: 1);
 
         var customCreation = new GameCreationData
@@ -126,7 +122,7 @@ public class GameEngineService
 
         ShuffleList(pool);
 
-        // Il Re è vincolato tassativamente a una delle 8 caselle della prima traversa
+        // Il Re è vincolato alla prima traversa (backRank)
         int kingCol = RandomNumberGenerator.GetInt32(8);
         board[backRank][kingCol] = new King(player);
 
@@ -157,13 +153,85 @@ public class GameEngineService
         }
     }
 
-    public void LoadCustomFen(string fen)
+    /// <summary>
+    /// Serializza esattamente la matrice 8x8 in 64 caratteri (evita limiti FEN su pedoni arretrati)
+    /// </summary>
+    public string SerializeBoardMatrix()
     {
-        ResetGame();
-        _game = new ChessGame(fen);
+        var sb = new StringBuilder(64);
+        for (int r = 0; r < 8; r++)
+        {
+            int rank = 8 - r;
+            for (int c = 0; c < 8; c++)
+            {
+                var p = _game.GetPieceAt(new Position((File)c, rank));
+                sb.Append(p != null ? p.GetFenCharacter() : '.');
+            }
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Ricostruisce la scacchiera esatta a partire dalla stringa a 64 caratteri
+    /// </summary>
+    public void LoadBoardMatrix(string matrix)
+    {
+        if (string.IsNullOrWhiteSpace(matrix) || matrix.Length != 64)
+        {
+            ResetGame();
+            return;
+        }
+
+        var board = new Piece[8][];
+        for (int r = 0; r < 8; r++)
+        {
+            board[r] = new Piece[8];
+            for (int c = 0; c < 8; c++)
+            {
+                char ch = matrix[r * 8 + c];
+                board[r][c] = CreatePieceFromFenChar(ch)!;
+            }
+        }
+
+        var customCreation = new GameCreationData
+        {
+            Board = board,
+            WhoseTurn = Player.White,
+            CanWhiteCastleKingSide = false,
+            CanWhiteCastleQueenSide = false,
+            CanBlackCastleKingSide = false,
+            CanBlackCastleQueenSide = false
+        };
+
+        _game = new ChessGame(customCreation);
         _positionHistory.Clear();
         TrackCurrentPosition();
+
+        WhiteTime = TimeSpan.FromMinutes(15);
+        BlackTime = TimeSpan.FromMinutes(15);
+        if (!_timer.IsEnabled) _timer.Start();
+
         OnMoveExecuted?.Invoke();
+    }
+
+    private static Piece? CreatePieceFromFenChar(char c)
+    {
+        return c switch
+        {
+            'P' => new Pawn(Player.White),
+            'N' => new Knight(Player.White),
+            'B' => new Bishop(Player.White),
+            'R' => new Rook(Player.White),
+            'Q' => new Queen(Player.White),
+            'K' => new King(Player.White),
+            'p' => new Pawn(Player.Black),
+            'n' => new Knight(Player.Black),
+            'b' => new Bishop(Player.Black),
+            'r' => new Rook(Player.Black),
+            'q' => new Queen(Player.Black),
+            'k' => new King(Player.Black),
+            _ => null
+        };
     }
 
     public Piece? GetPieceAt(int file, int rank)
@@ -241,19 +309,8 @@ public class GameEngineService
         }
         else if (movingPiece is Pawn)
         {
-            if (isCapture)
-            {
-                san = $"{fromSquare[0]}x{toSquare}";
-            }
-            else
-            {
-                san = toSquare;
-            }
-
-            if (promotion != ' ')
-            {
-                san += $"={char.ToUpperInvariant(promotion)}";
-            }
+            san = isCapture ? $"{fromSquare[0]}x{toSquare}" : toSquare;
+            if (promotion != ' ') san += $"={char.ToUpperInvariant(promotion)}";
         }
         else if (movingPiece != null)
         {
@@ -265,14 +322,8 @@ public class GameEngineService
         _game.MakeMove(move, true);
         TrackCurrentPosition();
 
-        if (IsCheckmate())
-        {
-            san += "#";
-        }
-        else if (IsPlayerInCheck(Turn))
-        {
-            san += "+";
-        }
+        if (IsCheckmate()) san += "#";
+        else if (IsPlayerInCheck(Turn)) san += "+";
 
         sanNotation = san;
         OnMoveExecuted?.Invoke();
@@ -286,9 +337,7 @@ public class GameEngineService
 
     private void TrackCurrentPosition()
     {
-        string fen = _game.GetFen();
-        string key = string.Join(" ", fen.Split(' ').Take(4));
-
+        string key = SerializeBoardMatrix() + "_" + Turn;
         if (_positionHistory.TryGetValue(key, out int count))
         {
             _positionHistory[key] = count + 1;
@@ -301,8 +350,7 @@ public class GameEngineService
 
     public bool IsDrawByRepetition()
     {
-        string fen = _game.GetFen();
-        string key = string.Join(" ", fen.Split(' ').Take(4));
+        string key = SerializeBoardMatrix() + "_" + Turn;
         return _positionHistory.TryGetValue(key, out int count) && count >= 3;
     }
 

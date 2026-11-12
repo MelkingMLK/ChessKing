@@ -50,17 +50,19 @@ public partial class GameViewModel : ObservableObject
                 OnPropertyChanged(nameof(IsModeSelectionVisible));
                 OnPropertyChanged(nameof(IsBoardViewVisible));
                 OnPropertyChanged(nameof(IsBgcActive));
+                OnPropertyChanged(nameof(CanShuffleBoard));
             }
         }
     }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsBgcActive))]
+    [NotifyPropertyChangedFor(nameof(CanShuffleBoard))]
     private SandboxType _activeSandboxType = SandboxType.None;
 
-    // Modalità stanza online
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsBgcActive))]
+    [NotifyPropertyChangedFor(nameof(CanShuffleBoard))]
     [NotifyPropertyChangedFor(nameof(IsOnlineStandardSelected))]
     [NotifyPropertyChangedFor(nameof(IsOnlineBgcSelected))]
     private string _selectedOnlineMatchType = "Standard";
@@ -68,10 +70,12 @@ public partial class GameViewModel : ObservableObject
     public bool IsOnlineStandardSelected => SelectedOnlineMatchType == "Standard";
     public bool IsOnlineBgcSelected => SelectedOnlineMatchType.StartsWith("BGC");
 
-    // BGC attivo sia se avviato da Sandbox sia se selezionato nella Online Room
     public bool IsBgcActive => 
         (CurrentGameMode == GameMode.Sandbox && ActiveSandboxType == SandboxType.BGC) ||
         (CurrentGameMode == GameMode.P2P && SelectedOnlineMatchType.StartsWith("BGC"));
+
+    // Lo shuffle è consentito SOLO prima che venga eseguita la primissima mossa della partita
+    public bool CanShuffleBoard => IsBgcActive && _moves.Count == 0 && !_engine.IsGameOver;
 
     public bool IsModeSelectionVisible => CurrentGameMode == GameMode.None;
     public bool IsBoardViewVisible => CurrentGameMode == GameMode.Local || CurrentGameMode == GameMode.Sandbox || (CurrentGameMode == GameMode.P2P && IsP2PGameActive);
@@ -259,7 +263,7 @@ public partial class GameViewModel : ObservableObject
             NetworkStatus = $"Errore di accesso: {err}";
         });
 
-        _network.OnGameStarted += (assignedColor, opponentName, matchType, fen) => Dispatcher.UIThread.Post(() =>
+        _network.OnGameStarted += (assignedColor, opponentName, matchType, boardState) => Dispatcher.UIThread.Post(() =>
         {
             IsConnecting = false;
             bool amIWhite = assignedColor.Equals("White", StringComparison.OrdinalIgnoreCase);
@@ -292,16 +296,27 @@ public partial class GameViewModel : ObservableObject
             _lastMoveCoordinates = null;
             _matchSaved = false;
 
-            if (!string.IsNullOrWhiteSpace(fen))
+            if (!string.IsNullOrWhiteSpace(boardState) && boardState.Length == 64)
             {
-                _engine.LoadCustomFen(fen);
+                _engine.LoadBoardMatrix(boardState);
             }
             else
             {
                 _engine.ResetGame();
             }
 
+            OnPropertyChanged(nameof(CanShuffleBoard));
             RefreshBoardFromEngine();
+        });
+
+        _network.OnBoardSyncReceived += (boardState) => Dispatcher.UIThread.Post(() =>
+        {
+            if (_moves.Count == 0 && !string.IsNullOrWhiteSpace(boardState) && boardState.Length == 64)
+            {
+                _engine.LoadBoardMatrix(boardState);
+                StatusMessage = "Schieramento BGC aggiornato!";
+                RefreshBoardFromEngine();
+            }
         });
 
         _network.OnMoveReceived += (movePayload) => Dispatcher.UIThread.Post(() =>
@@ -312,11 +327,13 @@ public partial class GameViewModel : ObservableObject
             if (coords.Length == 2)
             {
                 char promo = parts.Length > 1 && parts[1].Length > 0 ? parts[1][0] : ' ';
+                bool wasWhiteTurn = _engine.Turn == Player.White;
                 bool success = _engine.TryMoveWithSan(coords[0], coords[1], promo, out string san);
                 if (success)
                 {
                     _moves.Add(san);
-                    RecordMoveInHistory(coords[0], coords[1], san, isWhiteTurn: _engine.Turn != Player.White);
+                    OnPropertyChanged(nameof(CanShuffleBoard));
+                    RecordMoveInHistory(coords[0], coords[1], san, isWhiteTurn: wasWhiteTurn);
                     RefreshBoardFromEngine();
                 }
             }
@@ -378,7 +395,6 @@ public partial class GameViewModel : ObservableObject
                 var piece = _engine.GetPieceAt(chessFile, chessRank);
                 int index = r * 8 + c;
 
-                // Coordinate a bordo casella
                 Squares[index].RankCoordinate = (c == 0) ? chessRank.ToString() : string.Empty;
                 Squares[index].FileCoordinate = (r == 7) ? ((char)('a' + chessFile)).ToString() : string.Empty;
 
@@ -595,18 +611,26 @@ public partial class GameViewModel : ObservableObject
         _lastMoveCoordinates = null;
         _matchSaved = false;
 
-        _engine.ResetGame();
+        _engine.ShuffleInitialSetup();
+        OnPropertyChanged(nameof(CanShuffleBoard));
         RefreshBoardFromEngine();
     }
 
     [RelayCommand]
-    private void ShuffleBoard()
+    private async Task ShuffleBoard()
     {
-        if (IsBgcActive && _moves.Count == 0)
+        // Consentito solo prima che venga effettuata la primissima mossa della partita
+        if (CanShuffleBoard)
         {
             _engine.ShuffleInitialSetup();
             RefreshBoardFromEngine();
-            StatusMessage = "Scacchiera BGC mescolata! Re al sicuro sulla prima traversa.";
+            StatusMessage = "Schieramento BGC mescolato! Re al sicuro sulla prima traversa.";
+
+            if (CurrentGameMode == GameMode.P2P)
+            {
+                string matrix = _engine.SerializeBoardMatrix();
+                await _network.SendBoardSyncAsync(RoomCode.Trim().ToUpperInvariant(), matrix);
+            }
         }
     }
 
@@ -665,11 +689,11 @@ public partial class GameViewModel : ObservableObject
         IsConnecting = true;
         NetworkStatus = $"Creazione stanza [{RoomCode.Trim().ToUpperInvariant()}] ({SelectedOnlineMatchType})...";
 
-        string initialFen = string.Empty;
+        string initialMatrix = string.Empty;
         if (SelectedOnlineMatchType.StartsWith("BGC"))
         {
             _engine.ShuffleInitialSetup();
-            initialFen = _engine.RawGameInstance.GetFen();
+            initialMatrix = _engine.SerializeBoardMatrix();
         }
 
         await _network.CreateRoomAsync(
@@ -677,7 +701,7 @@ public partial class GameViewModel : ObservableObject
             RoomCode.Trim().ToUpperInvariant(), 
             Nickname.Trim(), 
             SelectedOnlineMatchType, 
-            initialFen
+            initialMatrix
         );
     }
 
@@ -753,6 +777,7 @@ public partial class GameViewModel : ObservableObject
             if (success)
             {
                 _moves.Add(sanNotation);
+                OnPropertyChanged(nameof(CanShuffleBoard));
                 RecordMoveInHistory(from, to, sanNotation, isWhiteTurn: wasWhite);
 
                 if (CurrentGameMode == GameMode.P2P)
@@ -793,6 +818,7 @@ public partial class GameViewModel : ObservableObject
         if (success)
         {
             _moves.Add(sanNotation);
+            OnPropertyChanged(nameof(CanShuffleBoard));
             RecordMoveInHistory(_pendingFromSquare, toSquare, sanNotation, isWhiteTurn: wasWhite);
 
             if (CurrentGameMode == GameMode.P2P)
@@ -859,6 +885,7 @@ public partial class GameViewModel : ObservableObject
         BlackMovesHistory.Clear();
         _lastMoveCoordinates = null;
         _matchSaved = false;
+        OnPropertyChanged(nameof(CanShuffleBoard));
         RefreshBoardFromEngine();
     }
 
@@ -876,12 +903,14 @@ public partial class GameViewModel : ObservableObject
         DrawResultText = string.Empty;
         IsVictoryModalActive = false;
         ActivePlayerName = "In attesa";
+        OnPropertyChanged(nameof(CanShuffleBoard));
         RefreshBoardFromEngine();
     }
 
     private async Task SaveCurrentMatchAsync(string winner, string reason)
     {
         _matchSaved = true;
+        OnPropertyChanged(nameof(CanShuffleBoard));
 
         var (_, _, advantage) = _engine.GetCapturedPiecesAndScore();
         string deltaString = advantage == 0 

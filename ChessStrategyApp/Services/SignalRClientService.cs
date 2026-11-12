@@ -12,8 +12,9 @@ public class SignalRClientService
 
     public event Action<string>? OnRoomCreated;
     public event Action<string>? OnJoinFailed;
-    public event Action<string, string, string, string>? OnGameStarted; // (color, opponent, matchType, initialFen)
+    public event Action<string, string, string, string>? OnGameStarted;
     public event Action<string>? OnMoveReceived;
+    public event Action<string>? OnBoardSyncReceived;
     public event Action? OnOpponentLeft;
     public event Action? OnConnected;
     public event Action<string>? OnConnectionFailed;
@@ -45,21 +46,22 @@ public class SignalRClientService
 
         _hubConnection.On<string>("RoomCreated", code => OnRoomCreated?.Invoke(code));
         _hubConnection.On<string>("JoinFailed", reason => OnJoinFailed?.Invoke(reason));
-        _hubConnection.On<string, string, string, string>("GameStarted", (color, opponent, matchType, fen) => 
-            OnGameStarted?.Invoke(color, opponent, matchType, fen));
+        _hubConnection.On<string, string, string, string>("GameStarted", (color, opponent, matchType, state) => 
+            OnGameStarted?.Invoke(color, opponent, matchType, state));
         _hubConnection.On<string>("ReceiveMove", move => OnMoveReceived?.Invoke(move));
+        _hubConnection.On<string>("ReceiveBoardSync", state => OnBoardSyncReceived?.Invoke(state));
         _hubConnection.On("OpponentLeft", () => OnOpponentLeft?.Invoke());
 
         await _hubConnection.StartAsync();
         OnConnected?.Invoke();
     }
 
-    public async Task CreateRoomAsync(string serverUrl, string roomCode, string hostName, string matchType, string initialFen)
+    public async Task CreateRoomAsync(string serverUrl, string roomCode, string hostName, string matchType, string initialBoardState)
     {
         try
         {
             await EnsureConnectedAsync(serverUrl);
-            await _hubConnection!.InvokeAsync("CreateRoom", roomCode, hostName, matchType, initialFen);
+            await _hubConnection!.InvokeAsync("CreateRoom", roomCode, hostName, matchType, initialBoardState);
         }
         catch (Exception ex)
         {
@@ -85,6 +87,14 @@ public class SignalRClientService
         if (IsConnected && _hubConnection != null)
         {
             await _hubConnection.InvokeAsync("SendMove", roomCode, moveData);
+        }
+    }
+
+    public async Task SendBoardSyncAsync(string roomCode, string boardState)
+    {
+        if (IsConnected && _hubConnection != null)
+        {
+            await _hubConnection.InvokeAsync("SyncBoard", roomCode, boardState);
         }
     }
 

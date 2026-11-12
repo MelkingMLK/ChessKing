@@ -1,4 +1,4 @@
-gitignore## --- Compilazione e Output .NET / MSBuild ---
+## --- Compilazione e Output .NET / MSBuild ---
 [Bb]in/
 [Oo]bj/
 [Oo]ut/
@@ -8,6 +8,13 @@ gitignore## --- Compilazione e Output .NET / MSBuild ---
 *.dll
 *.pdb
 *.exe
+
+## --- Dati locali di test, Cache e Repomix ---
+matches.json
+user_profile.json
+strategies.json
+repomix-output*.xml
+fix.md
 
 ## --- Visual Studio & VS Code ---
 .vscode/
